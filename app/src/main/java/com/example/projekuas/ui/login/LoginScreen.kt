@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -101,6 +103,10 @@ fun LoginScreen(
                 label = { Text("Username", color = Color.White) },
                 placeholder = { Text("Masukkan username", color = Color.LightGray) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next // Tombol keyboard jadi "Next" ➡️
+                ),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color.White,
@@ -121,7 +127,16 @@ fun LoginScreen(
                 placeholder = { Text("Masukkan password", color = Color.LightGray) },
                 singleLine = true,
                 visualTransformation = if (passwordVisibility) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done // Tombol keyboard jadi "Centang/Done" ✅
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        // Ketika user tekan Done di keyboard, langsung jalankan fungsi Login
+                        if (!state.isLoading) viewModel.login()
+                    }
+                ),
                 trailingIcon = {
                     val image = if (passwordVisibility)
                         Icons.Filled.Visibility

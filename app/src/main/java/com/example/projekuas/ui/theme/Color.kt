@@ -28,3 +28,12 @@ val SurfaceLight = Color(0xFFFFFFFF) // Putih untuk kartu
 // Dark Mode Colors (Ala John Doe Dark)
 val BackgroundDark = Color(0xFF121212) // Hitam pekat
 val SurfaceDark = Color(0xFF1E1E1E) // Abu gelap untuk kartu
+
+val GymGreen = Color(0xFF4CAF50)
+val GymGreenDark = Color(0xFF388E3C)
+val GymGreenLight = Color(0xFFC8E6C9)
+val SurfaceColor = Color(0xFFF5F5F5)
+
+val AdminPrimaryColor = Color(0xFF4CAF50)      // Hijau Utama
+val AdminBgColor = Color(0xFFF5F7FA)           // Abu-abu sangat muda (Background)
+val CardBgColor = Color.White                  // Warna kartu putih bersih

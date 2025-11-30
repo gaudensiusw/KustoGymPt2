@@ -8,68 +8,83 @@ import com.example.projekuas.data.ClassRepository
 import com.example.projekuas.data.HomeState
 import com.example.projekuas.data.ProfileRepository
 import com.example.projekuas.data.WorkoutDataRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// HomeViewModel ini nanti akan menerima Repository sebagai dependency
-// Hapus komentar saat Anda sudah mengimplementasikan Repository
 class HomeViewModel(
-    authRepository: AuthRepository,
-    workoutDataRepository: WorkoutDataRepository,
-    profileRepository: ProfileRepository,
-    classRepository: ClassRepository,
-    adminRepository: AdminRepository
+    private val authRepository: AuthRepository,
+    private val workoutDataRepository: WorkoutDataRepository,
+    private val profileRepository: ProfileRepository,
+    private val classRepository: ClassRepository,
+    private val adminRepository: AdminRepository
 ) : ViewModel() {
 
-    // StateFlow untuk menyimpan status dashboard
-    private val _state = MutableStateFlow(HomeState())
-    val state: StateFlow<HomeState> = _state
+    private val _homeState = MutableStateFlow(HomeState())
+    val homeState: StateFlow<HomeState> = _homeState
 
     init {
-        // Panggil fungsi untuk memuat data saat ViewModel pertama kali dibuat
-        loadDashboardData()
+        checkLoginStatus()
     }
 
-    /**
-     * Handler untuk mengubah item Bottom Bar yang dipilih.
-     * Mengubah state yang diamati oleh Composable GymBottomNavBar.
-     * @param index Indeks tab yang dipilih (0=Dashboard, 1=Booking, 2=Profile).
-     */
-    fun onBottomTabSelected(index: Int) {
-        _state.update { it.copy(selectedBottomTabIndex = index) }
-        // Di masa depan, Anda dapat memuat data spesifik di sini
-        // jika perpindahan tab memerlukan refresh data yang berbeda.
-    }
+    // --- FUNGSI AUTHENTICATION ---
 
-    /**
-     * Memuat semua data yang dibutuhkan untuk Home Dashboard.
-     * Saat ini menggunakan simulasi delay, nanti akan diganti dengan panggilan Repository.
-     */
-    fun loadDashboardData() {
+    fun checkLoginStatus() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _homeState.update { it.copy(isLoading = true) }
 
-            // --- SIMULASI PENGAMBILAN DATA (1 detik) ---
-            kotlinx.coroutines.delay(1000)
+            // Cek apakah ada user login di AuthRepository
+            val isUserLoggedIn = authRepository.isUserLoggedIn() // Pastikan fungsi ini ada di AuthRepository
 
-            // Setelah data diambil (simulasi sukses), update state
-            _state.update {
-                it.copy(
-                    userName = "Rahmat Hidayat",
-                    fitnessLevel = "Menengah",
-                    currentWeight = 75.5,
-                    targetWeight = 70.0,
-                    workoutsCompletedThisWeek = 3,
-                    membershipStatus = "Aktif (Premium)",
-                    isLoading = false
-                )
+            if (isUserLoggedIn) {
+                // Jika login, ambil role user dari ProfileRepository
+                // (Asumsi: Anda punya cara ambil role, kalau belum kita set default Member dulu)
+                val role = try {
+                    // profileRepository.getUserRole()
+                    "Member" // Default sementara biar ga error
+                } catch (e: Exception) {
+                    "Member"
+                }
+
+                _homeState.update {
+                    it.copy(
+                        isLoggedIn = true,
+                        userRole = role,
+                        isLoading = false
+                    )
+                }
+                loadDashboardData() // Load data jika login
+            } else {
+                _homeState.update {
+                    it.copy(
+                        isLoggedIn = false,
+                        isLoading = false
+                    )
+                }
             }
         }
     }
 
-    // Anda dapat menambahkan fungsi lain di sini, seperti:
-    // fun logout() { /* ... */ }
-    // fun refreshProgress() { /* ... */ }
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.signOut()
+            _homeState.update { it.copy(isLoggedIn = false) }
+        }
+    }
+
+    // --- DASHBOARD LOGIC ---
+
+    fun loadDashboardData() {
+        viewModelScope.launch {
+            // Simulasi load data
+            _homeState.update {
+                it.copy(
+                    userName = "User Gym",
+                    membershipStatus = "Active"
+                )
+            }
+        }
+    }
 }

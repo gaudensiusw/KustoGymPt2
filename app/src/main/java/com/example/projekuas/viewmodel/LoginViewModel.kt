@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.projekuas.data.AuthRepository
 import com.example.projekuas.data.LoginState
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -47,11 +50,11 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
                 _state.update { it.copy(isLoading = false, isLoginSuccessful = true) }
 
             } catch (e: Exception) {
-                // FIX: Tangkap error otentikasi dari Firebase.
-                // Firebase akan melempar exception jika kredensial salah.
-                val errorMessage = when (e.message) {
-                    // Anda bisa menambahkan penanganan error spesifik Firebase di sini
-                    else -> "Login Gagal: Periksa Email dan Password Anda."
+                val errorMessage = when (e) {
+                    is FirebaseAuthInvalidUserException -> "Akun tidak ditemukan. Silakan daftar terlebih dahulu."
+                    is FirebaseAuthInvalidCredentialsException -> "Password salah. Silakan coba lagi."
+                    is FirebaseNetworkException -> "Koneksi bermasalah. Periksa internet Anda."
+                    else -> "Login Gagal: ${e.localizedMessage ?: "Terjadi kesalahan sistem."}"
                 }
 
                 _state.update {

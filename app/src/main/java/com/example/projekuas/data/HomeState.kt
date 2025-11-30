@@ -4,7 +4,8 @@ data class HomeState(
     // Informasi Dasar Pengguna
     val userName: String = "Member Gym",
     val fitnessLevel: String = "Pemula",
-
+    val isLoggedIn: Boolean = false,
+    val userRole: String = "Member",
     // Status Progress
     val currentWeight: Double = 0.0,
     val targetWeight: Double = 0.0,

@@ -23,13 +23,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,17 +39,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.example.projekuas.R
 import com.example.projekuas.data.GymClass
-import com.example.projekuas.data.UserProfile
 import com.example.projekuas.navigation.HomeNavDestinations
 import com.example.projekuas.ui.booking.ClassBookingScreen
 import com.example.projekuas.ui.chat.ChatScreen
 import com.example.projekuas.ui.dashboard.AdminDashboardScreen
-import com.example.projekuas.ui.dashboard.MemberChatListScreen
 import com.example.projekuas.ui.dashboard.MemberDetailScreen
 import com.example.projekuas.ui.dashboard.NotificationScreen
 import com.example.projekuas.ui.dashboard.TrainerDashboardScreen
@@ -76,7 +68,10 @@ import com.example.projekuas.viewmodel.WorkoutViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.example.projekuas.ui.dashboard.AdminClassListScreen
+import com.example.projekuas.ui.dashboard.AdminMemberListScreen
+import com.example.projekuas.ui.dashboard.AdminReportsScreen
+import com.example.projekuas.ui.dashboard.AdminTrainerListScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.projekuas.ui.theme.GymOrange
@@ -444,11 +439,7 @@ fun PopularClassItem(gymClass: GymClass, onClick: () -> Unit) {
 }
 
 // --- ADMIN & USER MANAGEMENT ---
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AdminDashboardScreen(factory: HomeViewModelFactory) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Admin Dashboard") }
-}
+
 
 // --- MAIN HOMESCREEN WRAPPER ---
 
@@ -473,6 +464,8 @@ fun HomeScreen(
     val dashboardViewModel: DashboardViewModel = viewModel(factory = factory)
     val dashboardState by dashboardViewModel.dashboardState.collectAsState()
     val userRole = dashboardState.userRole
+
+
 
     Scaffold(
         bottomBar = {
@@ -555,8 +548,17 @@ fun HomeNavHost(
         // --- 1. DASHBOARD ---
         composable(HomeNavDestinations.Dashboard.route) {
             val dashboardVM: DashboardViewModel = viewModel(factory = factory)
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
             when (userRole) {
-                "Admin" -> AdminDashboardScreen(factory = factory)
+                "Admin" -> {
+                    AdminDashboardScreen(
+                        viewModel = adminViewModel,
+                        onNavigateToReports = { navController.navigate("admin_reports") },
+                        onNavigateToTrainers = { navController.navigate("trainer_list") },
+                        onNavigateToChat = { navController.navigate("member_chat_list") },
+                        onNavigateToClasses = { navController.navigate("admin_class_list") } // Route Baru
+                    )
+                }
                 "Trainer" -> {
                     TrainerDashboardScreen(
                         factory = factory,
@@ -646,6 +648,44 @@ fun HomeNavHost(
         composable(HomeNavDestinations.Membership.route) {
             val membershipViewModel: MembershipViewModel = viewModel(factory = factory)
             MembershipScreen(viewModel = membershipViewModel, onNavigateBack = { navController.popBackStack() })
+        }
+
+        // 1. MEMBER LIST (ADMIN)
+        composable("member_chat_list") {
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
+            AdminMemberListScreen(
+                viewModel = adminViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // 2. TRAINER LIST (ADMIN)
+        composable("trainer_list") {
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
+
+            // [FIX] Gunakan AdminTrainerListScreen, JANGAN TrainerListScreen
+            AdminTrainerListScreen(
+                viewModel = adminViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // 3. ADMIN REPORTS
+        composable("admin_reports") {
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
+            AdminReportsScreen(
+                viewModel = adminViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // 4. CLASS LIST
+        composable("admin_class_list") {
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
+            AdminClassListScreen(
+                viewModel = adminViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

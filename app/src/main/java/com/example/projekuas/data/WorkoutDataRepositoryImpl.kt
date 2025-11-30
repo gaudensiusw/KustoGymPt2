@@ -1,5 +1,6 @@
 package com.example.projekuas.data
 
+import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.WriteBatch
@@ -14,7 +15,7 @@ class WorkoutDataRepositoryImpl(
     // ==========================================
     // BAGIAN 2: FITUR BARU (PURE FIREBASE) - INI YANG DIPAKAI SEKARANG
     // ==========================================
-
+    private val exerciseCache = mutableMapOf<String, List<ExerciseMaster>>()
     // 1. Simpan Sesi Latihan
     override suspend fun saveWorkoutSession(session: WorkoutSession) {
         try {
@@ -67,8 +68,14 @@ class WorkoutDataRepositoryImpl(
 
     // 4. Ambil Daftar Latihan (Master Data)
     override suspend fun getExercisesByMuscle(muscle: String): List<ExerciseMaster> {
+        // 2. Cek apakah data sudah ada di cache?
+        if (exerciseCache.containsKey(muscle)) {
+            Log.d("WorkoutRepo", "Mengambil data $muscle dari CACHE")
+            return exerciseCache[muscle]!!
+        }
+
         return try {
-            // Coba ambil dari Firebase
+            Log.d("WorkoutRepo", "Mengambil data $muscle dari FIRESTORE")
             val snapshot = firestore.collection("exercises")
                 .whereEqualTo("targetMuscle", muscle)
                 .get()
@@ -76,12 +83,16 @@ class WorkoutDataRepositoryImpl(
 
             val exercises = snapshot.toObjects(ExerciseMaster::class.java)
 
-            // Jika kosong di DB, pakai Fallback Data lokal (agar UI tidak blank)
-            if (exercises.isEmpty()) {
+            val result = if (exercises.isEmpty()) {
                 getFallbackExercises(muscle)
             } else {
                 exercises
             }
+
+            // 3. Simpan ke cache sebelum return agar pemanggilan berikutnya cepat
+            exerciseCache[muscle] = result
+            result
+
         } catch (e: Exception) {
             getFallbackExercises(muscle)
         }

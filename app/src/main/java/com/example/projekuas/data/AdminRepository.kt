@@ -1,18 +1,26 @@
+// AdminRepository.kt
 package com.example.projekuas.data
 
 import kotlinx.coroutines.flow.Flow
 
 interface AdminRepository {
-    // 1. Mengambil semua pengguna (untuk daftar manajemen)
+    // --- FITUR LAMA (Agar tidak error 'overrides nothing') ---
     fun getAllUsersStream(): Flow<List<UserProfile>>
-
-    // 2. Mengubah peran pengguna (Member -> Trainer/Admin)
+    fun getAllBookingsStream(): Flow<List<Booking>> // <--- Tambahkan ini
+    fun getAllClassesStream(): Flow<List<GymClass>> // <--- TAMBAHKAN INI
     suspend fun updateUserRole(userId: String, newRole: String)
-
-    // 3. Menghapus pengguna
     suspend fun deleteUser(userId: String)
 
-    suspend fun deleteClass(classId: String)
+    // --- FITUR BARU (Dashboard) ---
+    fun getRealtimeMembers(): Flow<List<UserProfile>>
+    fun getRealtimeTrainers(): Flow<List<UserProfile>>
+    fun getRealtimeClasses(): Flow<List<GymClass>>
 
+    // Statistik
+    fun getDashboardStats(): Flow<DashboardStats>
+
+    // CRUD Kelas
+    suspend fun addClass(gymClass: GymClass)
     suspend fun updateClass(gymClass: GymClass)
+    suspend fun deleteClass(classId: String)
 }

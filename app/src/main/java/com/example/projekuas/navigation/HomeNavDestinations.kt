@@ -44,7 +44,9 @@ sealed class HomeNavDestinations(
 
     // Object E (Seleksi Latihan) - Tidak perlu Title/Icon
     object ExerciseSelection : HomeNavDestinations("exercise_selection/{muscleGroup}")
-
+    // --- Rute Tambahan ---
+    // Tambahkan ini agar tidak error di HomeScreen
+    object WorkoutLog : HomeNavDestinations("workout_log_history")
     // Object F (Contoh dari salah satu input Anda)
     // object ClassFormRouteWithIcon : HomeNavDestinations("class_form_route", "Kelas Baru", Icons.Filled.AddCircle)
 }

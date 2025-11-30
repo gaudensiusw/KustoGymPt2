@@ -65,8 +65,9 @@ class AuthRepositoryImpl(
             Log.d(TAG, "Penulisan profil ke Firestore berhasil.")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Penulisan profil ke Firestore GAGAL: ${e.message}", e)
-            throw Exception("Pendaftaran Gagal: Gagal menyimpan data profil. Cek koneksi atau aturan.")
+            // PENTING: Hapus user dari Auth jika gagal simpan ke DB
+            auth.currentUser?.delete()
+            throw Exception("Gagal menyimpan profil. Pendaftaran dibatalkan.")
         }
     }
 

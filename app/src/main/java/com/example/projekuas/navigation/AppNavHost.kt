@@ -33,6 +33,7 @@ import com.example.projekuas.ui.dashboard.TrainerListScreen
 // MemberDetailScreen tidak diimport disini karena sudah ada di HomeNavHost (Nested)
 import com.example.projekuas.ui.workout.ActiveWorkoutScreen
 import com.example.projekuas.ui.workout.ExerciseSelectionScreen
+import com.example.projekuas.viewmodel.AdminViewModel
 
 // --- Import ViewModels ---
 import com.example.projekuas.viewmodel.AuthViewModelFactory
@@ -246,8 +247,12 @@ fun AppNavHost(
 
         // --- Rute Admin Reports ---
         composable(HomeNavDestinations.AdminReports.route) {
+            // [FIX] Buat ViewModel di sini menggunakan factory
+            val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+
+            // [FIX] Kirim viewModel ke AdminReportsScreen
             AdminReportsScreen(
-                factory = homeFactory,
+                viewModel = adminViewModel,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

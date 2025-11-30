@@ -33,5 +33,9 @@ data class Booking(
     val progressRating: Int = 0,
     val rating: Int = 0, // 0 = Belum dirating, 1-5 = Rating
     val review: String = "", // Ulasan teks (opsional)
-    val trainerId: String = "" // PENTING: Kita butuh ID trainer di sini untuk update statistik
+    val trainerId: String = "", // PENTING: Kita butuh ID trainer di sini untuk update statistik
+
+    val gymClassTitle: String = "", // Judul kelas (opsional)
+    val gymClassDescription: String = "", // Deskripsi kelas (opsional
+    val price: Double = 150000.0
 )

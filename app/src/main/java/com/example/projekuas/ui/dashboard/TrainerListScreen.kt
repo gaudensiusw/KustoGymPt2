@@ -3,11 +3,9 @@ package com.example.projekuas.ui.dashboard
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -26,10 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.projekuas.data.UserProfile
-import com.example.projekuas.ui.theme.GymPurple
-import com.example.projekuas.viewmodel.TrainerListViewModel
+import com.example.projekuas.viewmodel.TrainerListViewModel // PENTING: Pakai ViewModel ini
 
-// Helper untuk gambar (sama seperti di Home)
+// Helper Image
 fun base64ToBitmapTrainer(base64String: String): android.graphics.Bitmap? {
     return try {
         val pureBase64Encoded = if (base64String.contains(",")) base64String.substringAfter(",") else base64String
@@ -41,37 +38,28 @@ fun base64ToBitmapTrainer(base64String: String): android.graphics.Bitmap? {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainerListScreen(
-    viewModel: TrainerListViewModel,
+    viewModel: TrainerListViewModel, // PENTING: Harus TrainerListViewModel
     onNavigateBack: () -> Unit,
     onNavigateToChat: (String) -> Unit
 ) {
     val trainers by viewModel.trainers.collectAsState()
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background, // <-- KUNCI DARK MODE
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary, // <-- Pakai warna tema
-                        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
-                    )
-            ) {
-                Column(modifier = Modifier.padding(top = 40.dp, start = 16.dp)) {
+            CenterAlignedTopAppBar(
+                title = { Text("Our Trainers", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                    Text(
-                        text = "Our Trainers",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 12.dp)
-                    )
-                }
-            }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
+            )
         }
     ) { padding ->
         if (trainers.isEmpty()) {
@@ -95,14 +83,13 @@ fun TrainerListScreen(
 @Composable
 fun RealTrainerCard(trainer: UserProfile, onChatClick: (String) -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), // <-- KUNCI DARK MODE (Surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar Logic
                 val bitmap = remember(trainer.profilePictureUrl) { base64ToBitmapTrainer(trainer.profilePictureUrl) }
                 if (bitmap != null) {
                     Image(
@@ -123,40 +110,28 @@ fun RealTrainerCard(trainer: UserProfile, onChatClick: (String) -> Unit) {
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Info
                 Column {
                     Text(
                         text = trainer.name,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface // Teks menyesuaikan mode
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    // Karena di UserProfile belum ada field 'specialty', kita pakai placeholder atau data lain
                     Text(
                         text = "Professional Trainer",
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 14.sp
                     )
-
                     Spacer(modifier = Modifier.height(4.dp))
-
-                    // Rating (Placeholder jika belum ada di DB)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(16.dp))
-                        Text(
-                            text = " 5.0 (Expert)",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(" 5.0 (Expert)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Chat Button
             Button(
-                onClick = { onChatClick(trainer.userId) }, // Gunakan ID dari Firebase
+                onClick = { onChatClick(trainer.userId) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(12.dp)

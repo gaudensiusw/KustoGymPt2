@@ -2,14 +2,18 @@ package com.example.projekuas.ui.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,306 +21,350 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.projekuas.viewmodel.HomeViewModelFactory
+import com.example.projekuas.viewmodel.AdminViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
-// --- WARNA TEMA ADMIN (HIJAU) ---
-val AdminGreenPrimary = Color(0xFF2E7D32)
-val AdminGreenDark = Color(0xFF1B5E20)
-val AdminBg = Color(0xFFF1F8E9)
+// --- WARNA TEMA ADMIN ---
+val AdminGreenPrimary = Color(0xFF4CAF50)
+val AdminGreenDark = Color(0xFF2E7D32)
+// Warna Teks khusus Light Mode (di Dark Mode kita pakai Color.White)
 
 @Composable
 fun AdminDashboardScreen(
-    factory: HomeViewModelFactory, // Placeholder factory jika nanti butuh VM
-    onNavigateToReports: () -> Unit = {} // Callback Navigasi
+    viewModel: AdminViewModel,
+    onNavigateToReports: () -> Unit,
+    onNavigateToTrainers: () -> Unit,
+    onNavigateToChat: () -> Unit,
+    onNavigateToClasses: () -> Unit
 ) {
-    Scaffold(containerColor = AdminBg) { paddingValues ->
+    val state by viewModel.dashboardState.collectAsState()
+    val recentActivities by viewModel.recentActivities.collectAsState()
+
+    // Deteksi Tema Sistem (Dark/Light)
+    val isDark = isSystemInDarkTheme()
+
+    // 1. Background Layar: Hitam di Dark Mode, Abu terang di Light Mode
+    val backgroundColor = if (isDark) Color(0xFF121212) else Color(0xFFF5F7FA)
+
+    Scaffold(
+        containerColor = backgroundColor
+    ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 20.dp)
+                .padding(bottom = padding.calculateBottomPadding()),
         ) {
-            // 1. HEADER (Hijau)
+            // --- BAGIAN 1: HEADER GRADIENT + STATISTIK ---
+            // Bagian ini backgroundnya SELALU HIJAU, jadi teksnya SELALU PUTIH (Aman untuk kedua mode)
             item {
-                AdminHeaderSection()
-            }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
+                        .background(Brush.verticalGradient(listOf(AdminGreenPrimary, AdminGreenDark)))
+                        .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp)
+                ) {
+                    Column {
+                        // Welcome Text
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    "Welcome back,",
+                                    color = Color.White.copy(0.7f),
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    "Admin",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp
+                                )
+                            }
+                            // Icon Notifikasi
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(Color.White.copy(0.2f), CircleShape)
+                                    .clickable {},
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Notifications, null, tint = Color.White)
+                            }
+                        }
 
-            // 2. QUICK ACTIONS
-            item {
-                AdminQuickActions(onNavigateToReports)
-            }
+                        Spacer(Modifier.height(30.dp))
 
-            // 3. PERFORMANCE OVERVIEW (Growth)
-            item {
-                PerformanceOverviewCard()
-            }
-
-            // 4. RECENT REVENUE CARD
-            item {
-                RevenueCard()
-            }
-
-            // 5. RECENT ACTIVITY LIST
-            item {
-                RecentActivitySection()
-            }
-        }
-    }
-}
-
-@Composable
-fun AdminHeaderSection() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp)
-            .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
-            .background(Brush.verticalGradient(listOf(AdminGreenPrimary, AdminGreenDark)))
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            // Top Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Admin Dashboard", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Row {
-                    IconButton(onClick = {}) { Icon(Icons.Default.Settings, null, tint = Color.White) }
-                    IconButton(onClick = {}) { Icon(Icons.Default.ExitToApp, null, tint = Color.White) }
+                        // Stats Grid (Glassmorphism - Transparan Putih)
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                AdminStatCard(
+                                    icon = Icons.Default.MonetizationOn,
+                                    value = formatCurrency(state.totalRevenue),
+                                    label = "Total Revenue",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                AdminStatCard(
+                                    icon = Icons.Default.Group,
+                                    value = state.activeMembers.toString(),
+                                    label = "Active Members",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                AdminStatCard(
+                                    icon = Icons.Default.FitnessCenter,
+                                    value = state.totalTrainers.toString(),
+                                    label = "Total Trainers",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                AdminStatCard(
+                                    icon = Icons.Default.EventAvailable,
+                                    value = state.activeSessions.toString(),
+                                    label = "Active Sessions",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-
-            // Stats Grid
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                AdminStatCard(
-                    icon = Icons.Default.Group,
-                    value = "1,234",
-                    label = "Total Members",
-                    trend = "+12%",
-                    modifier = Modifier.weight(1f)
-                )
-                AdminStatCard(
-                    icon = Icons.Default.FitnessCenter,
-                    value = "24",
-                    label = "Active Trainers",
-                    trend = "+2",
-                    isBlue = true,
-                    modifier = Modifier.weight(1f)
+            // --- BAGIAN 2: QUICK ACTIONS (FLOATING CARD) ---
+            item {
+                AdminQuickActionsSection(
+                    onReportsClick = onNavigateToReports,
+                    onTrainersClick = onNavigateToTrainers,
+                    onChatClick = onNavigateToChat,
+                    onClassesClick = onNavigateToClasses
                 )
             }
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                AdminStatCard(
-                    icon = Icons.Default.AttachMoney,
-                    value = "Rp 245M",
-                    label = "Monthly Revenue",
-                    trend = "+18%",
-                    modifier = Modifier.weight(1f)
-                )
-                AdminStatCard(
-                    icon = Icons.Default.CalendarToday,
-                    value = "32",
-                    label = "Classes Today",
-                    trend = "+5",
-                    isOrange = true,
-                    modifier = Modifier.weight(1f)
-                )
+
+            // --- BAGIAN 3: RECENT ACTIVITY ---
+            item {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    // Judul otomatis putih di Dark Mode
+                    Text(
+                        text = "Recent Activity",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else TextDark,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    if (recentActivities.isEmpty()) {
+                        Text(
+                            "Belum ada aktivitas terbaru.",
+                            color = if (isDark) Color.Gray else Color.DarkGray,
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    } else {
+                        recentActivities.forEach { activity ->
+                            AdminActivityItem(activity)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
         }
     }
 }
 
-@Composable
-fun AdminStatCard(icon: ImageVector, value: String, label: String, trend: String, isBlue: Boolean = false, isOrange: Boolean = false, modifier: Modifier = Modifier) {
-    val bgColor = when {
-        isBlue -> Color(0xFF1E88E5)
-        isOrange -> Color(0xFFFF6F00)
-        else -> Color(0xFF43A047)
-    }
+// --- KOMPONEN PENDUKUNG ---
 
+@Composable
+fun AdminStatCard(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    // Style Glassmorphism (Transparan) -> Selalu aman karena background induknya Hijau
     Card(
-        modifier = modifier.height(90.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.15f)),
-        shape = RoundedCornerShape(12.dp)
+        modifier = modifier.height(100.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.15f)),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
                 Box(
-                    modifier = Modifier.size(28.dp).background(bgColor, CircleShape),
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(Color.White.copy(0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(14.dp))
                 }
-                Text(trend, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    value,
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Column {
-                Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(label, color = Color.White.copy(0.8f), fontSize = 10.sp)
-            }
+            Text(
+                label,
+                color = Color.White.copy(0.8f),
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Clip
+            )
         }
     }
 }
 
 @Composable
-fun AdminQuickActions(onNavigateToReports: () -> Unit) {
+fun AdminQuickActionsSection(
+    onReportsClick: () -> Unit,
+    onTrainersClick: () -> Unit,
+    onChatClick: () -> Unit,
+    onClassesClick: () -> Unit
+) {
+    // 2. Kartu Floating: Warna container mengikuti tema (Putih/Hitam)
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .offset(y = (-30).dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+            .padding(horizontal = 20.dp)
+            .offset(y = (-24).dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(Modifier.padding(20.dp)) {
-            Text("Quick Actions", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                AdminActionItem(Icons.Default.Group, "Members", Color(0xFFF3E5F5), Color(0xFF9C27B0))
-                AdminActionItem(Icons.Default.FitnessCenter, "Trainers", Color(0xFFE3F2FD), Color(0xFF1976D2))
-                AdminActionItem(Icons.Default.Event, "Classes", Color(0xFFE8F5E9), Color(0xFF388E3C))
-                // Navigasi ke Laporan
-                AdminActionItem(
-                    icon = Icons.Default.BarChart,
-                    label = "Reports",
-                    bg = Color(0xFFFFF3E0),
-                    tint = Color(0xFFFF9800),
-                    onClick = onNavigateToReports
-                )
+            // Teks judul mengikuti tema (Hitam/Putih)
+            Text(
+                "Quick Actions",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(20.dp))
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Background icon dibuat semi-transparan warna agar tidak terlalu kontras di dark mode
+                AdminQuickActionItem(Icons.Default.Person, "Member", Color(0xFFFFF3E0), Color(0xFFF57C00), onChatClick)
+                AdminQuickActionItem(Icons.Default.SupervisorAccount, "Trainer", Color(0xFFE3F2FD), Color(0xFF1976D2), onTrainersClick)
+                AdminQuickActionItem(Icons.Default.Class, "Class", Color(0xFFF3E5F5), Color(0xFF9C27B0), onClassesClick)
+                AdminQuickActionItem(Icons.Default.Assessment, "Report", Color(0xFFE8F5E9), AdminGreenPrimary, onReportsClick)
+
             }
         }
     }
 }
 
 @Composable
-fun AdminActionItem(icon: ImageVector, label: String, bg: Color, tint: Color, onClick: () -> Unit = {}) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }) {
+fun AdminQuickActionItem(
+    icon: ImageVector,
+    label: String,
+    bg: Color,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    // Menyesuaikan background icon agar tidak terlalu terang di dark mode
+    // Jika dark mode, background icon digelapkan sedikit
+    val isDark = isSystemInDarkTheme()
+    val adaptiveBg = if (isDark) bg.copy(alpha = 0.2f) else bg
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
         Box(
-            modifier = Modifier.size(50.dp).background(bg, RoundedCornerShape(12.dp)),
+            modifier = Modifier
+                .size(56.dp)
+                .background(adaptiveBg, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, null, tint = tint)
+            Icon(icon, null, tint = tint, modifier = Modifier.size(28.dp))
         }
         Spacer(Modifier.height(8.dp))
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-fun PerformanceOverviewCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(Modifier.padding(20.dp)) {
-            Text("Performance Overview", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(Modifier.height(16.dp))
-
-            // Dummy Growth Bar
-            GrowthRow("January", 0.7f, "1050 members")
-            Spacer(Modifier.height(12.dp))
-            GrowthRow("February", 0.8f, "1120 members")
-            Spacer(Modifier.height(12.dp))
-            GrowthRow("March", 0.9f, "1180 members")
-        }
-    }
-}
-
-@Composable
-fun GrowthRow(label: String, progress: Float, value: String) {
-    Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, fontSize = 12.sp, color = Color.Gray)
-            Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = progress,
-            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-            color = AdminGreenPrimary,
-            trackColor = Color(0xFFE8F5E9)
+        // Label teks otomatis menyesuaikan tema
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
         )
     }
 }
 
 @Composable
-fun RevenueCard() {
+fun AdminActivityItem(activity: com.example.projekuas.data.RecentActivity) {
+    // 3. Kartu Aktivitas: Warna container mengikuti tema (Putih/Hitam)
     Card(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
-        colors = CardDefaults.cardColors(containerColor = AdminGreenPrimary),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text("This Month Revenue", color = Color.White.copy(0.8f), fontSize = 12.sp)
-                Text("Rp 245,000,000", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Column {
-                        Text("Memberships", color = Color.White.copy(0.7f), fontSize = 10.sp)
-                        Text("Rp 180M", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    Column {
-                        Text("Classes", color = Color.White.copy(0.7f), fontSize = 10.sp)
-                        Text("Rp 65M", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-            Icon(Icons.Default.AttachMoney, null, tint = Color.White.copy(0.3f), modifier = Modifier.size(60.dp))
-        }
-    }
-}
-
-@Composable
-fun RecentActivitySection() {
-    Column(Modifier.padding(horizontal = 20.dp)) {
-        Text("Recent Activity", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Spacer(Modifier.height(12.dp))
-
-        ActivityItem(Icons.Default.PersonAdd, "New member John Doe joined", "5 min ago", Color(0xFFE3F2FD), Color(0xFF1E88E5))
-        ActivityItem(Icons.Default.EventBusy, "Yoga class fully booked", "15 min ago", Color(0xFFE8F5E9), Color(0xFF43A047))
-        ActivityItem(Icons.Default.Payment, "Payment received from Jane", "1 hour ago", Color(0xFFFFF3E0), Color(0xFFFF9800))
-    }
-}
-
-@Composable
-fun ActivityItem(icon: ImageVector, title: String, time: String, bg: Color, tint: Color) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
-                modifier = Modifier.size(40.dp).background(bg, CircleShape),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(AdminGreenPrimary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+                Text(activity.userInitial, fontWeight = FontWeight.Bold, color = AdminGreenPrimary)
             }
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text(time, color = Color.Gray, fontSize = 12.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                // Judul Item mengikuti tema
+                Text(
+                    activity.action,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "${activity.user} • ${activity.time}",
+                    fontSize = 12.sp,
+                    color = if (isSystemInDarkTheme()) Color.Gray else Color.DarkGray
+                )
             }
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = Color.Gray)
+            Text(
+                activity.amount,
+                fontWeight = FontWeight.Bold,
+                color = AdminGreenPrimary,
+                fontSize = 14.sp
+            )
         }
+    }
+}
+
+fun formatCurrency(amount: Double): String {
+    return if (amount >= 1000000) {
+        val inMillions = amount / 1000000
+        "Rp ${String.format("%.1f", inMillions)}jt"
+    } else {
+        NumberFormat.getCurrencyInstance(Locale("id", "ID")).format(amount)
     }
 }
