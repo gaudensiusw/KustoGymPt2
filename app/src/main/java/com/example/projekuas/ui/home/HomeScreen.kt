@@ -4,9 +4,13 @@ package com.example.projekuas.ui.home
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,6 +23,7 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialogDefaults.containerColor
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +73,8 @@ import com.example.projekuas.viewmodel.WorkoutViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.platform.LocalDensity
 import com.example.projekuas.ui.dashboard.AdminClassListScreen
 import com.example.projekuas.ui.dashboard.AdminMemberListScreen
 import com.example.projekuas.ui.dashboard.AdminReportsScreen
@@ -458,70 +465,162 @@ fun HomeScreen(
     onLogout: () -> Unit
 ) {
     val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
+    // Hapus variabel navBackStackEntry dan currentDestination di sini
+    // karena sudah dipindahkan ke dalam FloatingBottomNavigation agar lebih bersih
 
     val dashboardViewModel: DashboardViewModel = viewModel(factory = factory)
     val dashboardState by dashboardViewModel.dashboardState.collectAsState()
     val userRole = dashboardState.userRole
-
-
+    val density = LocalDensity.current
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Scaffold(
-        bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                tonalElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    bottomNavItems.forEach { destination ->
-                        val isSelected = currentDestination?.route == destination.route
-                        val iconColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        containerColor = MaterialTheme.colorScheme.background, // Warna dasar aplikasi (Hitam/Putih)
+        // HAPUS parameter bottomBar dari sini! Kita pindahkan ke dalam Box.
+    ) { innerPadding ->
 
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
+        // GUNAKAN BOX UNTUK MENUMPUK KONTEN & NAVIGASI
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+            // PENTING: Jangan pakai padding innerPadding mentah-mentah ke semua sisi
+            // Kita hanya ambil padding bawah sistem jika diperlukan, tapi konten harus full screen
+        ) {
+            HomeNavHost(
+                navController = navController,
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Tambahkan padding bawah manual agar item paling bawah
+                    // di scrollable list (misal jadwal) tidak ketutup navigasi.
+                    // 100.dp adalah estimasi tinggi navigasi + jarak
+                    .padding(bottom = 100.dp),
+                factory = factory,
+                themeViewModel = themeViewModel,
+                userRole = dashboardState.userRole,
+                onLogout = onLogout,
+                onNavigateToWorkoutLog = onNavigateToWorkoutLog,
+                onNavigateToClassForm = onNavigateToClassForm,
+                onNavigateToSelection = onNavigateToSelection,
+                onNavigateToActiveWorkout = onNavigateToActiveWorkout,
+                onNavigateToMembership = onNavigateToMembership,
+                onNavigateToAdminReports = onNavigateToAdminReports
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter) // Taruh di bawah
+                    .padding(bottom = bottomInset) // Hindari garis gesture HP (garis putih bawah iPhone/Android)
+            ) {
+                FloatingBottomNavigation(navController = navController)
+            }
+        }
+    }
+}
+
+@Composable
+fun FloatingBottomNavigation(navController: NavHostController) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    // List menu manual agar lebih fleksibel
+    val items = listOf(
+        HomeNavDestinations.Dashboard,
+        HomeNavDestinations.Kelas,
+        HomeNavDestinations.Latihan,
+        HomeNavDestinations.Profil
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 20.dp) // Mengatur posisi melayang dari bawah
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainer, // Warna Pill (Ungu gelap/Putih)
+            tonalElevation = 3.dp,
+            shadowElevation = 10.dp,
+            shape = RoundedCornerShape(50.dp), // Bentuk Pill Oval Sempurna
+            modifier = Modifier.height(70.dp).fillMaxWidth() // Tinggi kotak oval
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceEvenly, // Jarak antar item rata
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { screen ->
+                    val isSelected = currentDestination?.route == screen.route
+
+                    // Animasi Naik Turun Ikon
+                    val offsetY by animateDpAsState(
+                        targetValue = if (isSelected) (-8).dp else 0.dp, // Kalau aktif, naik 8dp
+                        animationSpec = tween(durationMillis = 300),
+                        label = "offsetAnimation"
+                    )
+
+                    // Warna Ikon & Teks
+                    val activeColor = MaterialTheme.colorScheme.primary
+                    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .offset(y = offsetY) // Terapkan animasi naik
+                            .clip(CircleShape) // Efek ripple bulat
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null // Hilangkan ripple abu-abu standar agar bersih
+                            ) {
+                                if (currentDestination?.route != screen.route) {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
-                            },
-                            label = { destination.title?.let { Text(it, color = iconColor) } },
-                            icon = {
-                                Icon(
-                                    imageVector = when (destination.route) {
-                                        HomeNavDestinations.Dashboard.route -> Icons.Filled.Home
-                                        HomeNavDestinations.Kelas.route -> Icons.Filled.Schedule
-                                        HomeNavDestinations.Latihan.route -> Icons.Filled.FitnessCenter
-                                        HomeNavDestinations.Profil.route -> Icons.Filled.Person
-                                        else -> Icons.Filled.Home
-                                    },
-                                    contentDescription = destination.title,
-                                    tint = iconColor
-                                )
                             }
+                            .padding(8.dp) // Area sentuh
+                    ) {
+                        // IKON
+                        Icon(
+                            imageVector = when (screen) {
+                                HomeNavDestinations.Dashboard -> Icons.Filled.Home
+                                HomeNavDestinations.Kelas -> Icons.Filled.Schedule
+                                HomeNavDestinations.Latihan -> Icons.Filled.FitnessCenter
+                                HomeNavDestinations.Profil -> Icons.Filled.Person
+                                // Gunakan else jika perlu untuk memuaskan compiler
+                                else -> Icons.Filled.Home
+                            },
+                            contentDescription = screen.title,
+                            tint = if (isSelected) activeColor else inactiveColor,
+                            modifier = Modifier.size(26.dp)
                         )
+
+                        // TEKS (Hanya muncul jika aktif)
+                        AnimatedVisibility(visible = isSelected) {
+                            Text(
+                                text = screen.title ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = activeColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+
+                        // Opsional: Titik kecil di bawah teks untuk penanda lebih jelas
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(activeColor)
+                            )
+                        }
                     }
                 }
             }
         }
-    ) { paddingValues ->
-        HomeNavHost(
-            navController = navController,
-            modifier = Modifier.padding(paddingValues),
-            factory = factory,
-            themeViewModel = themeViewModel,
-            userRole = userRole,
-            onLogout = onLogout,
-            onNavigateToWorkoutLog = onNavigateToWorkoutLog,
-            onNavigateToClassForm = onNavigateToClassForm,
-            onNavigateToSelection = onNavigateToSelection,
-            onNavigateToActiveWorkout = onNavigateToActiveWorkout,
-            onNavigateToMembership = onNavigateToMembership,
-            onNavigateToAdminReports = onNavigateToAdminReports
-        )
     }
 }
 
