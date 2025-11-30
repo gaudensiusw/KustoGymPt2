@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.ProjekUAS" parent="android:Theme.Material.Light.NoActionBar">
+    <item name="colorPrimary">@color/trainer_primary</item>
+
+    <item name="colorPrimaryDark">@color/trainer_dark</item>
+
+    <item name="colorAccent">@color/trainer_primary</item>
+
+    <item name="colorControlActivated">@color/trainer_primary</item>
+
+    </style>
+</resources>

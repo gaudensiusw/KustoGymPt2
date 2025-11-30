@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "917264958456",
+    "project_id": "kustogym",
+    "storage_bucket": "kustogym.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:917264958456:android:5d8c8415538f613ca80c0d",
+        "android_client_info": {
+          "package_name": "com.example.projekuas"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "917264958456-utgth8lgjl4i3b7vt9j8qjlo6in91vd7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.projekuas",
+            "certificate_hash": "126f5522860b31c79236eab4a995b64834240323"
+          }
+        },
+        {
+          "client_id": "917264958456-02ke2ufvk0flqiqrk1ijammkko04hsn9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVO-G_Sr5H4hNg2Dk5X8kS9ogm2ptevX0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "917264958456-02ke2ufvk0flqiqrk1ijammkko04hsn9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
