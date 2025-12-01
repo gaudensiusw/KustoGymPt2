@@ -5,6 +5,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Assessment // Contoh untuk laporan
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.People
 import androidx.compose.ui.graphics.vector.ImageVector
 
 // Data class sederhana untuk item navigasi
@@ -14,40 +16,16 @@ data class BottomNavItem(
     val route: String
 )
 
-// Daftar menu untuk Admin
+// Menu untuk Admin
 val AdminNavItems = listOf(
-    BottomNavItem(
-        label = "Home",
-        icon = Icons.Default.Home,
-        route = "admin_home"
-    ),
-    BottomNavItem(
-        label = "Manage",
-        icon = Icons.Default.List,
-        route = "admin_manage_list" // Halaman daftar member/trainer
-    ),
-    BottomNavItem(
-        label = "Profile",
-        icon = Icons.Default.Person,
-        route = "admin_profile"
-    )
+    BottomNavItem("Home", Icons.Default.Home, "admin_home"),
+    BottomNavItem("Users", Icons.Default.People, "admin_users"), // Halaman Direktori
+    BottomNavItem("Profile", Icons.Default.Person, "profile")
 )
 
-// Daftar menu untuk Trainer
+// Menu untuk Trainer
 val TrainerNavItems = listOf(
-    BottomNavItem(
-        label = "Home",
-        icon = Icons.Default.Home,
-        route = "trainer_home"
-    ),
-    BottomNavItem(
-        label = "Schedules",
-        icon = Icons.Default.List, // Atau icon Calendar
-        route = "trainer_schedules"
-    ),
-    BottomNavItem(
-        label = "Profile",
-        icon = Icons.Default.Person,
-        route = "trainer_profile"
-    )
+    BottomNavItem("Home", Icons.Default.Home, "trainer_home"),
+    BottomNavItem("Schedule", Icons.Default.DateRange, "trainer_schedule"), // Halaman Kalender
+    BottomNavItem("Profile", Icons.Default.Person, "profile")
 )

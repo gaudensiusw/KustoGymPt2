@@ -424,8 +424,7 @@ fun HomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
-        Box(
-            modifier = Modifier.fillMaxSize()
+        Box(modifier = Modifier.fillMaxSize()
         ) {
             HomeNavHost(
                 navController = navController,
@@ -447,7 +446,7 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomInset)
+                    .padding(bottom = 20.dp)
             ) {
                 FloatingBottomNavigation(
                     navController = navController,
@@ -601,8 +600,11 @@ fun HomeNavHost(
                 onNavigateToClasses = { navController.navigate("admin_class_list") }
             )
         }
-        composable("admin_manage") { /* Placeholder */ }
-
+        // Di dalam HomeNavHost, ganti placeholder ini:
+        composable("admin_manage") {
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
+            AdminMemberListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
+        }
         // [FIX] Tambahkan Route Admin Profile
         composable("admin_profile") {
             ProfileScreen(
