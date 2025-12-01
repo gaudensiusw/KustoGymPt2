@@ -43,16 +43,34 @@ import com.example.projekuas.viewmodel.ProfileViewModel
 // Data Dropdown Global
 val fitnessLevels = listOf("Pemula", "Menengah", "Mahir")
 
+// Warna Khusus Role
+val AdminGreen = Color(0xFF4CAF50)
+val TrainerBlue = Color(0xFF1E88E5)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel,
+    userRole: String = "Member", // Parameter Role Ditambahkan
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit
 ) {
     // 1. Ambil State dari ViewModel
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.userProfile
+
+    // --- LOGIKA WARNA DINAMIS BERDASARKAN ROLE ---
+    val primaryColor = when (userRole.lowercase()) {
+        "admin" -> AdminGreen
+        "trainer" -> TrainerBlue
+        else -> MaterialTheme.colorScheme.primary // Default Member
+    }
+
+    val darkPrimaryColor = when (userRole.lowercase()) {
+        "admin" -> Color(0xFF2E7D32)
+        "trainer" -> Color(0xFF1565C0)
+        else -> MaterialTheme.colorScheme.primaryContainer
+    }
 
     // State Lokal UI
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -65,7 +83,6 @@ fun ProfileScreen(
     val bmiValue = if (weightKg > 0) weightKg / (heightM * heightM) else 0.0
     val bmiFormatted = String.format("%.1f", bmiValue)
 
-    // Warna Status BMI (Tetap Hardcoded agar konsisten maknanya)
     val bmiStatus = when {
         bmiValue == 0.0 -> "Belum ada data" to MaterialTheme.colorScheme.onSurfaceVariant
         bmiValue < 18.5 -> "Underweight" to Color(0xFF2196F3)
@@ -82,7 +99,6 @@ fun ProfileScreen(
     }
 
     Scaffold(
-        // FIX: Gunakan warna background dari tema
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {}
     ) { paddingValues ->
@@ -94,14 +110,14 @@ fun ProfileScreen(
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
 
-            // --- BAGIAN 1: HEADER UNGU + KARTU STATISTIK MENGAMBANG ---
+            // --- BAGIAN 1: HEADER WARNA DINAMIS + KARTU STATISTIK ---
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(430.dp)
                 ) {
-                    // A. Background Ungu Melengkung
+                    // A. Background Melengkung (Warna mengikuti Role)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -109,11 +125,7 @@ fun ProfileScreen(
                             .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
                             .background(
                                 Brush.verticalGradient(
-                                    // Gunakan warna Primary tema (Ungu)
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    )
+                                    colors = listOf(primaryColor, darkPrimaryColor)
                                 )
                             )
                     ) {
@@ -144,7 +156,7 @@ fun ProfileScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Foto Profil
                             Box(contentAlignment = Alignment.Center) {
@@ -190,25 +202,39 @@ fun ProfileScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            // Nama & Email (Selalu Putih di Header Ungu)
+                            // Nama & Email
                             Text(
                                 text = profile.name.ifEmpty { "Nama Pengguna" },
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = profile.email,
                                 fontSize = 14.sp,
                                 color = Color.White.copy(alpha = 0.8f)
                             )
+
+                            // Badge Role (Baru)
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = userRole.uppercase(),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
 
-                    // B. Row Kartu Statistik (Overlap)
+                    // B. Row Kartu Statistik (Warna Ikon mengikuti Role)
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -220,17 +246,20 @@ fun ProfileScreen(
                         StatFloatingCard(
                             icon = Icons.Outlined.Straighten,
                             value = "${profile.heightCm.toInt()} cm",
-                            label = "Height"
+                            label = "Height",
+                            iconTint = primaryColor // Kirim warna dinamis
                         )
                         StatFloatingCard(
                             icon = Icons.Outlined.MonitorWeight,
                             value = "${profile.weightKg.toInt()} kg",
-                            label = "Weight"
+                            label = "Weight",
+                            iconTint = primaryColor
                         )
                         StatFloatingCard(
                             icon = Icons.Outlined.Speed,
                             value = bmiFormatted,
-                            label = "BMI"
+                            label = "BMI",
+                            iconTint = primaryColor
                         )
                     }
                 }
@@ -245,7 +274,6 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp),
                     shape = RoundedCornerShape(16.dp),
-                    // FIX: Gunakan Surface Color
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
@@ -263,7 +291,12 @@ fun ProfileScreen(
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Fitness Level", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(4.dp))
-                            Text(profile.fitnessLevel.ifEmpty { "-" }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                profile.fitnessLevel.ifEmpty { "-" },
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = primaryColor // Gunakan warna role
+                            )
                         }
                     }
                 }
@@ -277,7 +310,6 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp),
                     shape = RoundedCornerShape(16.dp),
-                    // FIX: Gunakan Surface Color
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
@@ -287,7 +319,6 @@ fun ProfileScreen(
 
                         InfoRow(Icons.Outlined.Email, "Email", profile.email)
                         Spacer(Modifier.height(15.dp))
-
                         InfoRow(Icons.Outlined.Phone, "Phone", "Belum diatur")
                         Spacer(Modifier.height(15.dp))
                         InfoRow(Icons.Outlined.LocationOn, "Address", "Indonesia")
@@ -307,7 +338,6 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp),
                     shape = RoundedCornerShape(16.dp),
-                    // FIX: Gunakan Surface Color
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
@@ -349,11 +379,10 @@ fun ProfileScreen(
         )
     }
 
-    // --- BOTTOM SHEET: FORM EDIT PROFIL ---
+    // --- BOTTOM SHEET: FORM EDIT PROFIL (Disesuaikan dengan Warna Role) ---
     if (showEditSheet) {
         ModalBottomSheet(
             onDismissRequest = { showEditSheet = false },
-            // FIX: Gunakan Surface Color
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
@@ -376,11 +405,10 @@ fun ProfileScreen(
                     label = { Text("Nama Lengkap") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    // FIX: Warna input menyesuaikan tema
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedBorderColor = primaryColor,
+                        focusedLabelColor = primaryColor,
+                        cursorColor = primaryColor,
                         focusedTextColor = MaterialTheme.colorScheme.onSurface,
                         unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
@@ -397,9 +425,9 @@ fun ProfileScreen(
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            focusedLabelColor = MaterialTheme.colorScheme.primary,
-                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedBorderColor = primaryColor,
+                            focusedLabelColor = primaryColor,
+                            cursorColor = primaryColor,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
@@ -412,9 +440,9 @@ fun ProfileScreen(
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            focusedLabelColor = MaterialTheme.colorScheme.primary,
-                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedBorderColor = primaryColor,
+                            focusedLabelColor = primaryColor,
+                            cursorColor = primaryColor,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
@@ -425,6 +453,7 @@ fun ProfileScreen(
                 // Dropdown Level
                 LevelFitnessDropdown(
                     selectedLevel = profile.fitnessLevel,
+                    activeColor = primaryColor, // Kirim warna dinamis
                     onLevelSelected = viewModel::onFitnessLevelSelected
                 )
                 Spacer(Modifier.height(24.dp))
@@ -436,7 +465,7 @@ fun ProfileScreen(
                         showEditSheet = false
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor), // Warna Tombol Dinamis
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (uiState.isLoading) {
@@ -458,13 +487,12 @@ fun ProfileScreen(
 // --- KOMPONEN UI PENDUKUNG ---
 
 @Composable
-fun StatFloatingCard(icon: ImageVector, value: String, label: String) {
+fun StatFloatingCard(icon: ImageVector, value: String, label: String, iconTint: Color) { // Tambah parameter iconTint
     Card(
         modifier = Modifier
             .width(100.dp)
             .height(110.dp),
         shape = RoundedCornerShape(16.dp),
-        // FIX: Gunakan Surface Color
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
@@ -473,7 +501,8 @@ fun StatFloatingCard(icon: ImageVector, value: String, label: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            // Gunakan warna dinamis
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -520,7 +549,7 @@ fun SettingsItem(title: String, isDestructive: Boolean = false, onClick: () -> U
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LevelFitnessDropdown(selectedLevel: String, onLevelSelected: (String) -> Unit) {
+fun LevelFitnessDropdown(selectedLevel: String, activeColor: Color, onLevelSelected: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
@@ -536,9 +565,9 @@ fun LevelFitnessDropdown(selectedLevel: String, onLevelSelected: (String) -> Uni
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                focusedBorderColor = activeColor,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = activeColor,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             )

@@ -30,11 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.example.projekuas.R
 import com.example.projekuas.data.GymClass
 import com.example.projekuas.viewmodel.HomeViewModelFactory
@@ -45,17 +40,10 @@ import java.util.*
 // --- WARNA TEMA TRAINER (BIRU) ---
 val TrainerBluePrimary = Color(0xFF1E88E5)
 val TrainerBlueDark = Color(0xFF1565C0)
-val TrainerBlueLight = Color(0xFFBBDEFB)
 val TrainerBg = Color(0xFFF5F9FF)
 val TextDark = Color(0xFF1E1E1E)
 
-// Definisi Nav Item Lokal (Bisa dipindah ke file terpisah)
-data class TrainerNavItem(
-    val label: String,
-    val icon: ImageVector,
-    val route: String
-)
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun TrainerDashboardScreen(
     factory: HomeViewModelFactory,
@@ -63,111 +51,16 @@ fun TrainerDashboardScreen(
     onNavigateToSchedule: () -> Unit,
     onNavigateToMembers: () -> Unit
 ) {
-    // Nav Controller untuk Bottom Nav Internal
-    val trainerNavController = rememberNavController()
-
-    // Setup ViewModel di level atas agar bisa di-pass ke halaman lain jika perlu
     val viewModel: TrainerViewModel = viewModel(factory = factory)
-
-    val navItems = listOf(
-        TrainerNavItem("Home", Icons.Default.Home, "trainer_home"),
-        TrainerNavItem("Schedule", Icons.Default.CalendarMonth, "trainer_schedule"),
-        TrainerNavItem("Profile", Icons.Default.Person, "trainer_profile")
-    )
-
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by trainerNavController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route
-
-                navItems.forEach { item ->
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = currentRoute == item.route,
-                        onClick = {
-                            trainerNavController.navigate(item.route) {
-                                popUpTo(trainerNavController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
-                }
-            }
-        },
-        floatingActionButton = {
-            // FAB hanya muncul di Home atau Schedule, opsional
-            FloatingActionButton(
-                onClick = { onNavigateToClassForm(null) },
-                containerColor = TrainerBluePrimary,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Filled.Add, "Add Class")
-            }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = trainerNavController,
-            startDestination = "trainer_home",
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            // TAB 1: HOME
-            composable("trainer_home") {
-                TrainerHomeContent(
-                    viewModel = viewModel,
-                    onNavigateToClassForm = onNavigateToClassForm,
-                    onNavigateToSchedule = {
-                        // Jika klik "See All", pindah tab ke Schedule
-                        trainerNavController.navigate("trainer_schedule")
-                    },
-                    onNavigateToMembers = onNavigateToMembers
-                )
-            }
-
-            // TAB 2: SCHEDULE
-            composable("trainer_schedule") {
-                // Di sini Anda bisa memanggil TrainerScheduleScreen() jika sudah diimport
-                // import com.example.projekuas.ui.dashboard.TrainerScheduleScreen
-
-                // Placeholder agar kode berjalan
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Halaman Trainer Schedule (My Classes)")
-                    // TrainerScheduleScreen(...)
-                }
-            }
-
-            // TAB 3: PROFILE
-            composable("trainer_profile") {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Halaman Trainer Profile")
-                }
-            }
-        }
-    }
-}
-
-// --- KONTEN DASHBOARD ASLI (DIPINDAHKAN KE SINI) ---
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
-@Composable
-fun TrainerHomeContent(
-    viewModel: TrainerViewModel,
-    onNavigateToClassForm: (String?) -> Unit,
-    onNavigateToSchedule: () -> Unit,
-    onNavigateToMembers: () -> Unit
-) {
     val state by viewModel.uiState.collectAsState()
     val isRefreshing = state.isRefreshing
     var showEarningsDialog by remember { mutableStateOf(false) }
+
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isRefreshing,
         onRefresh = { viewModel.refreshData() }
     )
 
-    // ... (Dialog & Snackbar Logic dari kode asli) ...
     // Earnings Dummy Dialog
     if (showEarningsDialog) {
         AlertDialog(
@@ -179,6 +72,12 @@ fun TrainerHomeContent(
         )
     }
 
+    // Snackbar Host State (jika ingin menampilkan error/success)
+    val snackbarHostState = remember { SnackbarHostState() }
+    state.error?.let { msg -> LaunchedEffect(msg) { snackbarHostState.showSnackbar(msg); viewModel.clearMessages() } }
+    state.successMessage?.let { msg -> LaunchedEffect(msg) { snackbarHostState.showSnackbar(msg); viewModel.clearMessages() } }
+
+    // --- STRUKTUR UTAMA: Gunakan BOX sebagai root pengganti Scaffold ---
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -186,7 +85,8 @@ fun TrainerHomeContent(
             .pullRefresh(pullRefreshState)
     ) {
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 80.dp)
+            // PENTING: Padding bawah lebih besar untuk mengakomodasi FAB + Floating Nav
+            contentPadding = PaddingValues(bottom = 120.dp)
         ) {
             // 1. HEADER SECTION
             item {
@@ -235,16 +135,36 @@ fun TrainerHomeContent(
             }
         }
 
+        // Indikator Pull Refresh
         PullRefreshIndicator(
             refreshing = isRefreshing,
             state = pullRefreshState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+
+        // Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+
+        // FAB MANUAL POSITIONING
+        // Kita letakkan FAB di dalam Box, align BottomEnd
+        // Beri padding bottom yang cukup agar berada di ATAS Floating Bottom Nav HomeScreen
+        FloatingActionButton(
+            onClick = { onNavigateToClassForm(null) },
+            containerColor = TrainerBluePrimary,
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 100.dp, end = 24.dp) // Sesuaikan bottom padding agar tidak tertutup nav bar
+        ) {
+            Icon(Icons.Filled.Add, "Add Class")
+        }
     }
 }
 
-// --- SUB-COMPONENTS (TETAP SAMA) ---
-// Copy semua sub-components (TrainerHeaderSection, TrainerStatCard, dll) dari kode lama anda ke bawah sini.
+// --- SUB-COMPONENTS TRAINER ---
 
 @Composable
 fun TrainerHeaderSection(name: String, classesCount: Int, activeMembers: Int, performanceRate: Double) {
@@ -258,7 +178,9 @@ fun TrainerHeaderSection(name: String, classesCount: Int, activeMembers: Int, pe
         Column {
             Text("Welcome back,", color = Color.White.copy(0.7f), fontSize = 16.sp)
             Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+
             Spacer(Modifier.height(30.dp))
+
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TrainerStatCard(Icons.Default.CalendarToday, "$classesCount", "Classes Today", Modifier.weight(1f))
