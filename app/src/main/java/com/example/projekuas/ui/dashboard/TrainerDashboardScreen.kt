@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.DarkMode // Tambahkan ini
+import androidx.compose.material.icons.outlined.LightMode // Tambahkan ini
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -33,11 +35,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projekuas.R
 import com.example.projekuas.data.GymClass
 import com.example.projekuas.viewmodel.HomeViewModelFactory
+import com.example.projekuas.viewmodel.ThemeViewModel // Tambahkan ini
 import com.example.projekuas.viewmodel.TrainerViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
-// --- WARNA TEMA TRAINER (BIRU) ---
+// Warna Tema Trainer (Biru)
 val TrainerBluePrimary = Color(0xFF1E88E5)
 val TrainerBlueDark = Color(0xFF1565C0)
 val TrainerBg = Color(0xFFF5F9FF)
@@ -47,6 +50,7 @@ val TextDark = Color(0xFF1E1E1E)
 @Composable
 fun TrainerDashboardScreen(
     factory: HomeViewModelFactory,
+    themeViewModel: ThemeViewModel, // <--- 1. Parameter Baru
     onNavigateToClassForm: (String?) -> Unit,
     onNavigateToSchedule: () -> Unit,
     onNavigateToMembers: () -> Unit
@@ -61,7 +65,6 @@ fun TrainerDashboardScreen(
         onRefresh = { viewModel.refreshData() }
     )
 
-    // Earnings Dummy Dialog
     if (showEarningsDialog) {
         AlertDialog(
             onDismissRequest = { showEarningsDialog = false },
@@ -72,20 +75,17 @@ fun TrainerDashboardScreen(
         )
     }
 
-    // Snackbar Host State (jika ingin menampilkan error/success)
     val snackbarHostState = remember { SnackbarHostState() }
     state.error?.let { msg -> LaunchedEffect(msg) { snackbarHostState.showSnackbar(msg); viewModel.clearMessages() } }
     state.successMessage?.let { msg -> LaunchedEffect(msg) { snackbarHostState.showSnackbar(msg); viewModel.clearMessages() } }
 
-    // --- STRUKTUR UTAMA: Gunakan BOX sebagai root pengganti Scaffold ---
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(TrainerBg)
+            .background(MaterialTheme.colorScheme.background) // Gunakan tema
             .pullRefresh(pullRefreshState)
     ) {
         LazyColumn(
-            // PENTING: Padding bawah lebih besar untuk mengakomodasi FAB + Floating Nav
             contentPadding = PaddingValues(bottom = 120.dp)
         ) {
             // 1. HEADER SECTION
@@ -94,7 +94,10 @@ fun TrainerDashboardScreen(
                     name = state.trainerName,
                     classesCount = state.classesTodayCount,
                     activeMembers = state.activeMembersCount,
-                    performanceRate = state.performanceRate
+                    performanceRate = state.performanceRate,
+                    // 2. Kirim Data Tema ke Header
+                    isDarkMode = themeViewModel.isDarkMode,
+                    onToggleTheme = { themeViewModel.toggleTheme() }
                 )
             }
 
@@ -135,39 +138,29 @@ fun TrainerDashboardScreen(
             }
         }
 
-        // Indikator Pull Refresh
         PullRefreshIndicator(
             refreshing = isRefreshing,
             state = pullRefreshState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
-        // Snackbar
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
-
-        // FAB MANUAL POSITIONING
-        // Kita letakkan FAB di dalam Box, align BottomEnd
-        // Beri padding bottom yang cukup agar berada di ATAS Floating Bottom Nav HomeScreen
-        FloatingActionButton(
-            onClick = { onNavigateToClassForm(null) },
-            containerColor = TrainerBluePrimary,
-            contentColor = Color.White,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp, end = 24.dp) // Sesuaikan bottom padding agar tidak tertutup nav bar
-        ) {
-            Icon(Icons.Filled.Add, "Add Class")
-        }
     }
 }
 
-// --- SUB-COMPONENTS TRAINER ---
-
+// --- UPDATE HEADER UNTUK ADA TOMBOL TEMA ---
 @Composable
-fun TrainerHeaderSection(name: String, classesCount: Int, activeMembers: Int, performanceRate: Double) {
+fun TrainerHeaderSection(
+    name: String,
+    classesCount: Int,
+    activeMembers: Int,
+    performanceRate: Double,
+    isDarkMode: Boolean,      // <--- Parameter Baru
+    onToggleTheme: () -> Unit // <--- Parameter Baru
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -176,8 +169,26 @@ fun TrainerHeaderSection(name: String, classesCount: Int, activeMembers: Int, pe
             .padding(24.dp)
     ) {
         Column {
-            Text("Welcome back,", color = Color.White.copy(0.7f), fontSize = 16.sp)
-            Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            // Row Header Atas (Welcome + Theme Toggle)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Welcome back,", color = Color.White.copy(0.7f), fontSize = 16.sp)
+                    Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                }
+
+                // Tombol Tema
+                IconButton(onClick = onToggleTheme) {
+                    Icon(
+                        imageVector = if (isDarkMode) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                        contentDescription = "Toggle Theme",
+                        tint = Color.White
+                    )
+                }
+            }
 
             Spacer(Modifier.height(30.dp))
 
@@ -197,6 +208,7 @@ fun TrainerHeaderSection(name: String, classesCount: Int, activeMembers: Int, pe
     }
 }
 
+// ... (Sisa komponen TrainerStatCard, QuickActionsSection, dll TETAP SAMA seperti file lama Anda)
 @Composable
 fun TrainerStatCard(icon: ImageVector, value: String, label: String, modifier: Modifier = Modifier, isOrange: Boolean = false) {
     Card(
@@ -224,12 +236,12 @@ fun TrainerStatCard(icon: ImageVector, value: String, label: String, modifier: M
 fun QuickActionsSection(onScheduleClick: () -> Unit, onMembersClick: () -> Unit, onEarningsClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-10).dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), // Gunakan surface color agar adaptif tema
         elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(Modifier.padding(20.dp)) {
-            Text("Quick Actions", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextDark)
+            Text("Quick Actions", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(20.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 QuickActionItem(Icons.Default.CalendarMonth, "Schedule", Color(0xFFE3F2FD), TrainerBluePrimary, onScheduleClick)
@@ -247,7 +259,7 @@ fun QuickActionItem(icon: ImageVector, label: String, bg: Color, tint: Color, on
             Icon(icon, null, tint = tint, modifier = Modifier.size(32.dp))
         }
         Spacer(Modifier.height(8.dp))
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextDark)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -257,7 +269,7 @@ fun TrainerClassItem(gymClass: GymClass, onEdit: () -> Unit, onDelete: () -> Uni
     val dateObj = Date(gymClass.startTimeMillis)
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), // Adaptif tema
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
@@ -283,7 +295,7 @@ fun TrainerClassItem(gymClass: GymClass, onEdit: () -> Unit, onDelete: () -> Uni
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(gymClass.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextDark)
+                Text(gymClass.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text("${timeFormat.format(dateObj)} • ${gymClass.durationMinutes} min", color = Color.Gray, fontSize = 12.sp)
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -325,7 +337,7 @@ fun MonthlyPerformanceCard(sessionsCount: Int, satisfactionRate: Double) {
 @Composable
 fun SectionHeader(title: String, onSeeAll: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextDark)
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
         TextButton(onClick = onSeeAll) { Text("View All", color = TrainerBluePrimary) }
     }
 }

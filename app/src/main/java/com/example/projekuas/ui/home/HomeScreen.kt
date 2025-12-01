@@ -594,6 +594,7 @@ fun HomeNavHost(
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminDashboardScreen(
                 viewModel = adminViewModel,
+                themeViewModel = themeViewModel, // PASS THIS
                 onNavigateToReports = { navController.navigate("admin_reports") },
                 onNavigateToTrainers = { navController.navigate("trainer_list") },
                 onNavigateToChat = { navController.navigate("member_chat_list") },
@@ -619,6 +620,7 @@ fun HomeNavHost(
         composable("trainer_home") {
             TrainerDashboardScreen(
                 factory = factory,
+                themeViewModel = themeViewModel, // PASS THIS
                 onNavigateToClassForm = onNavigateToClassForm,
                 onNavigateToSchedule = {
                     navController.navigate("trainer_schedule") { launchSingleTop = true }
