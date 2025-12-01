@@ -2,23 +2,25 @@ package com.example.projekuas.ui.login
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -33,7 +35,9 @@ import com.example.projekuas.viewmodel.LoginViewModel
 fun LoginScreen(
     viewModel: LoginViewModel = viewModel(),
     onNavigateToSignUp: () -> Unit,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onGoogleSignInClick: () -> Unit = {},
+    onNavigateBack: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     var passwordVisibility by remember { mutableStateOf(false) }
@@ -44,167 +48,189 @@ fun LoginScreen(
         }
     }
 
-    // Menggunakan Box untuk menumpuk elemen (background, shape, dan konten)
+    // --- STRUKTUR UI UTAMA ---
+    // Gunakan Box untuk menumpuk elemen
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF5A5A5A)) // Warna latar belakang utama abu-abu gelap
+        modifier = Modifier.fillMaxSize()
+        // CATATAN: .background(MaterialTheme.colorScheme.primary) DIHAPUS dari sini
     ) {
-        // Shape abu-abu melengkung di bagian bawah
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.7f) // Tinggi shape bawah ~70% dari layar
-                .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(topStart = 60.dp, topEnd = 60.dp)) // Bentuk melengkung di atas
-                .background(Color(0xFF8A8A8A)) // Warna abu-abu yang lebih terang untuk shape bawah
+        // =====================================================================
+        // LAYER 1: GAMBAR LATAR BELAKANG (Paling Bawah)
+        // =====================================================================
+        Image(
+            // GANTI 'login_bg_placeholder' DENGAN NAMA FILE GAMBAR ANDA DI DRAWABLE
+            painter = painterResource(id = R.drawable.image3),
+            contentDescription = null, // Background dekoratif tidak butuh deskripsi
+            contentScale = ContentScale.Crop, // Memenuhi layar, memotong jika perlu
+            modifier = Modifier.fillMaxSize()
         )
 
-        // Konten utama layar Login (Menggunakan Column non-scrollable)
-        Column(
+        // =====================================================================
+        // LAYER 2: OVERLAY WARNA (Opsional tapi Sangat Disarankan)
+        // Memberi lapisan transparan warna primary (ungu) di atas gambar
+        // agar teks putih tetap mudah dibaca.
+        // =====================================================================
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top // Elemen dimulai dari atas
+                // Ubah nilai alpha (0.0f - 1.0f) untuk mengatur transparansi.
+                // 0.7f berarti 70% warna ungu, 30% gambar terlihat.
+                .background(Color.Gray.copy(alpha = 0.3f))
+        )
+
+        // =====================================================================
+        // LAYER 3: KONTEN SCREEN (Header, Card, Footer)
+        // =====================================================================
+
+        // 1. HEADER (Logo & Teks Welcome) - Posisi Tengah Atas
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 60.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Logo (Ukuran Gede)
+            // LOGO APP
             Image(
-                painter = painterResource(id = R.drawable.logo_kusto_gym), // Pastikan nama file dan path benar
-                contentDescription = "Kusto Gym Logo",
+                painter = painterResource(id = R.drawable.logo_kusto_gym),
+                contentDescription = "App Logo",
                 modifier = Modifier
-                    .size(250.dp) // FIX: Ukuran logo besar (250dp)
-                    .padding(top = 40.dp, bottom = 20.dp),
+                    .size(240.dp)
+                    .padding(bottom = 8.dp),
                 contentScale = ContentScale.Fit
             )
 
-            // Teks "Login"
+            // Teks Header
             Text(
-                text = "Login",
-                style = MaterialTheme.typography.headlineLarge.copy(
+                text = "Welcome Back!",
+                style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp,
-                    color = Color.White
-                ),
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
-
-            // FIX PENTING: SPACER ELASTIS
-            // Spacer ini mengambil semua ruang yang tersisa, mendorong elemen di bawahnya
-            // (input fields, button) ke bagian bawah layar.
-            Spacer(modifier = Modifier.weight(1f))
-
-            // --- BAGIAN INPUT DAN TOMBOL (DIDORONG KE BAWAH) ---
-
-            // Username Field
-            OutlinedTextField(
-                value = state.email,
-                onValueChange = viewModel::onEmailChange,
-                label = { Text("Username", color = Color.White) },
-                placeholder = { Text("Masukkan username", color = Color.LightGray) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next // Tombol keyboard jadi "Next" ➡️
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.LightGray,
-                    cursorColor = Color.White,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    // Warna teks putih agar kontras dengan overlay ungu
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
             )
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Password Field
-            OutlinedTextField(
-                value = state.password,
-                onValueChange = viewModel::onPasswordChange,
-                label = { Text("Password", color = Color.White) },
-                placeholder = { Text("Masukkan password", color = Color.LightGray) },
-                singleLine = true,
-                visualTransformation = if (passwordVisibility) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done // Tombol keyboard jadi "Centang/Done" ✅
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        // Ketika user tekan Done di keyboard, langsung jalankan fungsi Login
-                        if (!state.isLoading) viewModel.login()
-                    }
-                ),
-                trailingIcon = {
-                    val image = if (passwordVisibility)
-                        Icons.Filled.Visibility
-                    else Icons.Filled.VisibilityOff
-
-                    IconButton(onClick = {
-                        passwordVisibility = !passwordVisibility
-                    }) {
-                        Icon(imageVector = image, "Toggle password visibility", tint = Color.White)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.LightGray,
-                    cursorColor = Color.White,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                )
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Login Button
-            Button(
-                onClick = viewModel::login,
-                enabled = !state.isLoading,
+        // 2. KARTU LOGIN (Tengah Layar)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 140.dp)
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF333333),
-                    contentColor = Color.White
-                )
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        Modifier.size(24.dp),
-                        color = Color.White
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // --- INPUTS & BUTTONS (Kode sama seperti sebelumnya) ---
+                    LoginInputLabel(text = "Email")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = state.email,
+                        onValueChange = viewModel::onEmailChange,
+                        placeholder = { Text("your.email@example.com", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)) },
+                        leadingIcon = { Icon(Icons.Outlined.Email, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        )
                     )
-                } else {
-                    Text(
-                        text = "Login",
-                        style = MaterialTheme.typography.titleLarge
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LoginInputLabel(text = "Password")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = state.password,
+                        onValueChange = viewModel::onPasswordChange,
+                        placeholder = { Text("Enter your password", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)) },
+                        leadingIcon = { Icon(Icons.Outlined.Lock, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        trailingIcon = {
+                            val image = if (passwordVisibility) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                            IconButton(onClick = { passwordVisibility = !passwordVisibility }) {
+                                Icon(image, "Toggle visibility", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        visualTransformation = if (passwordVisibility) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        )
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = viewModel::login,
+                        enabled = !state.isLoading,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+                    ) {
+                        if (state.isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        } else {
+                            Text(text = "Login", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    state.error?.let { errorMessage ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = errorMessage, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
+        }
 
-            // Tampilkan error jika ada
-            state.error?.let { errorMessage ->
+        // 3. FOOTER (Sign Up Text) - Di bawah Kartu
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 50.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = errorMessage,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 16.dp)
+                    text = "Don't have an account? ",
+                    // Warna teks putih agar kontras dengan overlay ungu
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                    fontSize = 14.sp
                 )
-            }
-
-            // TextButton untuk SignUp (jika belum punya akun)
-            TextButton(
-                onClick = onNavigateToSignUp,
-                modifier = Modifier.padding(top = 16.dp, bottom = 40.dp) // Padding bawah untuk tombol
-            ) {
                 Text(
-                    text = "Belum punya akun? Daftar di sini.",
-                    color = Color.White
+                    text = "Sign Up",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.clickable { onNavigateToSignUp() }
                 )
             }
         }
     }
+}
+
+// Komponen Helper untuk Label Input (Tidak berubah)
+@Composable
+fun LoginInputLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.bodyMedium.copy(
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    )
 }
