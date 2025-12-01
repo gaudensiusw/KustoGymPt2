@@ -77,12 +77,27 @@ val HomeClassImages = listOf(
     R.drawable.image9
 )
 
-// Helper Data Class untuk menyatukan tipe menu navigasi
+// Helper Data Class
 data class UnifiedNavItem(
     val label: String,
     val icon: ImageVector,
     val route: String
 )
+
+fun base64ToBitmapHome(base64String: String): android.graphics.Bitmap? {
+    return try {
+        val pureBase64Encoded = if (base64String.contains(",")) {
+            base64String.substringAfter(",")
+        } else {
+            base64String
+        }
+        val decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
 
 // ==========================================
 // --- 1. MEMBER DASHBOARD SCREEN ---
@@ -134,7 +149,7 @@ fun MemberDashboardScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 120.dp) // Padding bawah agar tidak tertutup nav bar
+                contentPadding = PaddingValues(bottom = 120.dp)
             ) {
                 // 1. HEADER UNGU
                 item {
@@ -383,7 +398,7 @@ fun PopularClassItem(gymClass: GymClass, onClick: () -> Unit) {
 }
 
 // ==========================================
-// --- 2. MAIN HOMESCREEN WRAPPER (NAVIGASI DIPERBAIKI) ---
+// --- 2. MAIN HOMESCREEN WRAPPER ---
 // ==========================================
 
 @Composable
@@ -403,24 +418,20 @@ fun HomeScreen(
     val dashboardViewModel: DashboardViewModel = viewModel(factory = factory)
     val dashboardState by dashboardViewModel.dashboardState.collectAsState()
 
-    // Perbaikan Error: Ambil role dari state
     val userRole = dashboardState.userRole.ifBlank { "Member" }
-
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
-        // Container Utama (Box)
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // 1. NAVHOST (Konten)
             HomeNavHost(
                 navController = navController,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = 100.dp), // Padding agar konten paling bawah tidak tertutup nav bar
+                    .padding(bottom = 100.dp),
                 factory = factory,
                 themeViewModel = themeViewModel,
                 userRole = userRole,
@@ -433,7 +444,6 @@ fun HomeScreen(
                 onNavigateToAdminReports = onNavigateToAdminReports
             )
 
-            // 2. FLOATING NAVIGATION BAR (Melayang di bawah)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -453,7 +463,8 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Tentukan item navigasi berdasarkan Role
+    // FIX: Pastikan nama route di sini (AdminNavItems/TrainerNavItems)
+    // SAMA PERSIS dengan route yang didaftarkan di HomeNavHost
     val items: List<UnifiedNavItem> = when (userRole.lowercase()) {
         "admin" -> AdminNavItems.map { UnifiedNavItem(it.label, it.icon, it.route) }
         "trainer" -> TrainerNavItems.map { UnifiedNavItem(it.label, it.icon, it.route) }
@@ -467,9 +478,9 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
 
     // Warna indikator berdasarkan role
     val indicatorColor = when (userRole.lowercase()) {
-        "admin" -> AdminGreenPrimary // Hijau Admin
-        "trainer" -> TrainerBluePrimary // Biru Trainer
-        else -> MaterialTheme.colorScheme.primary // Default Member
+        "admin" -> Color(0xFF4CAF50) // AdminGreen
+        "trainer" -> Color(0xFF1E88E5) // TrainerBlue
+        else -> MaterialTheme.colorScheme.primary
     }
 
     Box(
@@ -492,7 +503,6 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
                 items.forEach { screen ->
                     val isSelected = currentRoute == screen.route
 
-                    // Animasi Naik Turun Ikon
                     val offsetY by animateDpAsState(
                         targetValue = if (isSelected) (-8).dp else 0.dp,
                         animationSpec = tween(durationMillis = 300),
@@ -573,7 +583,6 @@ fun HomeNavHost(
 ) {
     NavHost(
         navController = navController,
-        // Tentukan start destination dinamis berdasarkan role
         startDestination = when (userRole.lowercase()) {
             "admin" -> "admin_home"
             "trainer" -> "trainer_home"
@@ -581,10 +590,9 @@ fun HomeNavHost(
         },
         modifier = modifier
     ) {
-        // --- 1. RUTE ADMIN ---
+        // --- 1. ADMIN ROUTES ---
         composable("admin_home") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            // Fix: Hapus onLogout, gunakan callback navigasi yang benar
             AdminDashboardScreen(
                 viewModel = adminViewModel,
                 onNavigateToReports = { navController.navigate("admin_reports") },
@@ -593,9 +601,19 @@ fun HomeNavHost(
                 onNavigateToClasses = { navController.navigate("admin_class_list") }
             )
         }
-        composable("admin_manage") { /* Placeholder jika diperlukan */ }
+        composable("admin_manage") { /* Placeholder */ }
 
-        // --- 2. RUTE TRAINER ---
+        // [FIX] Tambahkan Route Admin Profile
+        composable("admin_profile") {
+            ProfileScreen(
+                viewModel = viewModel(factory = factory),
+                userRole = "Admin",
+                onLogout = onLogout,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // --- 2. TRAINER ROUTES ---
         composable("trainer_home") {
             TrainerDashboardScreen(
                 factory = factory,
@@ -612,7 +630,17 @@ fun HomeNavHost(
             TrainerScheduleScreen(factory = factory, onNavigateToClassForm = onNavigateToClassForm)
         }
 
-        // --- 3. RUTE MEMBER ---
+        // [FIX] Tambahkan Route Trainer Profile (Sesuai Logcat Error)
+        composable("trainer_profile") {
+            ProfileScreen(
+                viewModel = viewModel(factory = factory),
+                userRole = "Trainer",
+                onLogout = onLogout,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // --- 3. MEMBER ROUTES ---
         composable(HomeNavDestinations.Dashboard.route) {
             val dashboardVM: DashboardViewModel = viewModel(factory = factory)
             val classBookingViewModel: ClassBookingViewModel = viewModel(factory = factory)
@@ -631,11 +659,10 @@ fun HomeNavHost(
             )
         }
 
-        // --- 4. RUTE UMUM (KELAS, LATIHAN, PROFILE) ---
+        // --- 4. SHARED ROUTES ---
         composable(HomeNavDestinations.Kelas.route) {
             val dashboardVM: DashboardViewModel = viewModel(factory = factory)
             val dashState by dashboardVM.dashboardState.collectAsState()
-            // Fallback userRole dari parameter jika state belum siap
             val currentRole = if (dashState.userRole.isNotBlank()) dashState.userRole else userRole
 
             if (currentRole.equals("Trainer", ignoreCase = true)) {
@@ -659,26 +686,27 @@ fun HomeNavHost(
             )
         }
 
+        // Route Profile Default (Member)
         composable(HomeNavDestinations.Profil.route) {
-            // Profil untuk Member/Admin/Trainer (Route Utama)
             ProfileScreen(
                 viewModel = viewModel(factory = factory),
-                userRole = userRole, // <--- TAMBAHKAN INI! (PENTING)
+                userRole = userRole,
                 onLogout = onLogout,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
+        // Alias route untuk profile umum
         composable("profile") {
             ProfileScreen(
                 viewModel = viewModel(factory = factory),
-                userRole = userRole, // <--- TAMBAHKAN INI JUGA
+                userRole = userRole,
                 onLogout = onLogout,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // --- 5. RUTE DETAIL & FITUR LAIN ---
+        // --- 5. SUB-SCREENS ---
         composable(TRAINER_MEMBERS_ROUTE) {
             TrainerMembersScreen(
                 factory = factory,
@@ -734,7 +762,5 @@ fun HomeNavHost(
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminClassListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
         }
-
-
     }
 }
