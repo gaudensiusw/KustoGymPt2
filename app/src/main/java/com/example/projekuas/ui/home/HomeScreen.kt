@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -151,7 +152,7 @@ fun MemberDashboardScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 120.dp)
             ) {
-                // 1. HEADER UNGU
+                // 1. HEADER
                 item {
                     Box(
                         modifier = Modifier
@@ -424,8 +425,7 @@ fun HomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             HomeNavHost(
                 navController = navController,
                 modifier = Modifier
@@ -446,7 +446,7 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 20.dp)
+                    .padding(bottom = bottomInset + 20.dp) // Tambahkan padding bottom sedikit agar tidak menempel banget
             ) {
                 FloatingBottomNavigation(
                     navController = navController,
@@ -462,8 +462,7 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // FIX: Pastikan nama route di sini (AdminNavItems/TrainerNavItems)
-    // SAMA PERSIS dengan route yang didaftarkan di HomeNavHost
+    // Mapping Item Navigasi
     val items: List<UnifiedNavItem> = when (userRole.lowercase()) {
         "admin" -> AdminNavItems.map { UnifiedNavItem(it.label, it.icon, it.route) }
         "trainer" -> TrainerNavItems.map { UnifiedNavItem(it.label, it.icon, it.route) }
@@ -475,7 +474,7 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
         )
     }
 
-    // Warna indikator berdasarkan role
+    // Warna indikator
     val indicatorColor = when (userRole.lowercase()) {
         "admin" -> Color(0xFF4CAF50) // AdminGreen
         "trainer" -> Color(0xFF1E88E5) // TrainerBlue
@@ -485,7 +484,7 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .padding(horizontal = 24.dp)
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainer,
@@ -521,12 +520,15 @@ fun FloatingBottomNavigation(navController: NavHostController, userRole: String)
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
-                                if (currentRoute != screen.route) {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
+                                // --- PERBAIKAN: Hapus cek if (currentRoute != screen.route) ---
+                                // Ini memastikan tombol selalu merespons klik, bahkan jika di tab yang sama (untuk reset ke root)
+                                navController.navigate(screen.route) {
+                                    // Pop sampai ke Start Destination GRAPH
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
                                     }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
                             }
                             .padding(8.dp)
@@ -594,19 +596,24 @@ fun HomeNavHost(
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminDashboardScreen(
                 viewModel = adminViewModel,
-                themeViewModel = themeViewModel, // PASS THIS
+                themeViewModel = themeViewModel,
                 onNavigateToReports = { navController.navigate("admin_reports") },
                 onNavigateToTrainers = { navController.navigate("trainer_list") },
                 onNavigateToChat = { navController.navigate("member_chat_list") },
                 onNavigateToClasses = { navController.navigate("admin_class_list") }
             )
         }
-        // Di dalam HomeNavHost, ganti placeholder ini:
-        /*composable("admin_manage") {
+
+        // Route Tab 2 Admin (Directory)
+        composable("admin_users") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            AdminMemberListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
-        }*/
-        // [FIX] Tambahkan Route Admin Profile
+            AdminDirectoryScreen(
+                viewModel = adminViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // Route Profile Admin
         composable("admin_profile") {
             ProfileScreen(
                 viewModel = viewModel(factory = factory),
@@ -620,7 +627,7 @@ fun HomeNavHost(
         composable("trainer_home") {
             TrainerDashboardScreen(
                 factory = factory,
-                themeViewModel = themeViewModel, // PASS THIS
+                themeViewModel = themeViewModel,
                 onNavigateToClassForm = onNavigateToClassForm,
                 onNavigateToSchedule = {
                     navController.navigate("trainer_schedule") { launchSingleTop = true }
@@ -630,11 +637,13 @@ fun HomeNavHost(
                 }
             )
         }
+
+        // Route Tab 2 Trainer (Schedule)
         composable("trainer_schedule") {
             TrainerScheduleScreen(factory = factory, onNavigateToClassForm = onNavigateToClassForm)
         }
 
-        // [FIX] Tambahkan Route Trainer Profile (Sesuai Logcat Error)
+        // Route Profile Trainer
         composable("trainer_profile") {
             ProfileScreen(
                 viewModel = viewModel(factory = factory),
@@ -690,7 +699,7 @@ fun HomeNavHost(
             )
         }
 
-        // Route Profile Default (Member)
+        // Route Profile Member
         composable(HomeNavDestinations.Profil.route) {
             ProfileScreen(
                 viewModel = viewModel(factory = factory),
@@ -700,7 +709,7 @@ fun HomeNavHost(
             )
         }
 
-        // Alias route untuk profile umum
+        // Alias route profile
         composable("profile") {
             ProfileScreen(
                 viewModel = viewModel(factory = factory),
@@ -755,8 +764,8 @@ fun HomeNavHost(
         composable("trainer_list") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminTrainerListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
-        }
-*/
+        }*/
+
         composable("admin_reports") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminReportsScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
@@ -765,14 +774,6 @@ fun HomeNavHost(
         composable("admin_class_list") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminClassListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable("admin_users") { // Sesuaikan nama rute dengan BottomNavItem
-            val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            AdminDirectoryScreen(
-                viewModel = adminViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
         }
     }
 }
