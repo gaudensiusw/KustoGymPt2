@@ -9,44 +9,36 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.projekuas.R // Pastikan resource R.drawable.image3 tersedia
+import com.example.projekuas.R
 import com.example.projekuas.data.GymClass
 import com.example.projekuas.viewmodel.HomeViewModelFactory
 import com.example.projekuas.viewmodel.TrainerViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Warna Tema Biru (Sesuai Referensi)
-val ScheduleBluePrimary = Color(0xFF1E88E5)
-val ScheduleBlueDark = Color(0xFF1565C0)
-val ScheduleCardBg = Color(0xFFF5F7FA)
+// Warna Tema
+val TrainerBlue = Color(0xFF1E88E5)
 
 @Composable
 fun TrainerScheduleScreen(
@@ -60,364 +52,241 @@ fun TrainerScheduleScreen(
     LaunchedEffect(Unit) { viewModel.refreshData() }
 
     Scaffold(
+        containerColor = TrainerBg,
         floatingActionButton = {
-            // Floating Button Tambah Kelas
             FloatingActionButton(
                 onClick = { onNavigateToClassForm(null) },
-                containerColor = ScheduleBluePrimary,
+                containerColor = TrainerBlue,
                 contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Class")
             }
         }
-    ) { paddingValues ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.White)
-                .verticalScroll(rememberScrollState()) // Tambahkan scroll agar aman di layar kecil
+                .padding(padding)
         ) {
-            // 1. HEADER SECTION (Blue Gradient + Stats)
-            // Menggunakan 0 untuk totalMembers karena data ini tidak tersedia di ViewModel yang ada
-            ScheduleHeader(
-                classesCount = state.classesThisWeek,
-                totalMembers = 0,
-                totalHours = state.totalHoursThisWeek,
-                // TODO: Ganti onNavigateBack dengan logika navigasi yang benar
-                onNavigateBack = { /* Implement global back */ }
-            )
+            // 1. HEADER TANGGAL (Bulan & Tahun dari Selected Date)
+            val headerDateFormatter = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+            val headerDate = headerDateFormatter.format(Date(state.selectedDate))
 
-            // 2. CALENDAR STRIP
-            DateSelectorStrip(
-                selectedDate = state.selectedDate,
-                onDateSelected = { viewModel.onDateSelected(it) }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 3. CLASS LIST
-            if (state.isLoading && state.classesTaught.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = ScheduleBluePrimary)
-                }
-            } else {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
                     Text(
-                        "${state.filteredClasses.size} Classes Scheduled",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        text = "Schedule",
+                        fontSize = 14.sp,
+                        color = Color.Gray
                     )
+                    Text(
+                        text = headerDate,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E1E1E)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = TrainerBlue,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
 
-                    if (state.filteredClasses.isEmpty()) {
-                        EmptyScheduleState()
-                    } else {
-                        state.filteredClasses.forEach { gymClass ->
-                            ClassSessionCard(
+            // 2. CALENDAR STRIP (Scroll Horizontal)
+            // Generate 14 hari (2 hari lalu s/d 11 hari ke depan)
+            val dateList = remember {
+                val list = mutableListOf<Long>()
+                val cal = Calendar.getInstance()
+                cal.add(Calendar.DAY_OF_YEAR, -2)
+                for (i in 0..13) {
+                    list.add(cal.timeInMillis)
+                    cal.add(Calendar.DAY_OF_YEAR, 1)
+                }
+                list
+            }
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(dateList) { dateMillis ->
+                    DateSelectorItem(
+                        dateMillis = dateMillis,
+                        isSelected = isSameDay(dateMillis, state.selectedDate),
+                        onClick = { viewModel.onDateSelected(dateMillis) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // 3. LIST JADWAL (FILTERED CLASSES)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = Color.White,
+                        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+                    )
+                    .padding(24.dp)
+            ) {
+                val displayDate = SimpleDateFormat("EEEE, dd MMM", Locale.getDefault()).format(Date(state.selectedDate))
+
+                Text(
+                    text = displayDate,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E1E1E),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                if (state.isLoading) {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = TrainerBlue)
+                    }
+                } else if (state.filteredClasses.isEmpty()) {
+                    EmptyStateSchedule()
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(state.filteredClasses) { gymClass ->
+                            ScheduleCardItem(
                                 gymClass = gymClass,
                                 onClick = { onNavigateToClassForm(gymClass.classId) }
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // 4. WEEK SUMMARY
-                    WeekSummaryCard(
-                        totalClasses = state.classesThisWeek,
-                        totalHours = state.totalHoursThisWeek,
-                        avgParticipants = state.avgParticipants,
-                        attendanceRate = state.attendanceRate
-                    )
-
-                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
         }
     }
 }
 
-// --- COMPONENT: HEADER ---
+// --- KOMPONEN PENDUKUNG ---
+
 @Composable
-fun ScheduleHeader(classesCount: Int, totalMembers: Int, totalHours: Int, onNavigateBack: () -> Unit) {
-    Box(
+fun DateSelectorItem(dateMillis: Long, isSelected: Boolean, onClick: () -> Unit) {
+    val dayFormat = SimpleDateFormat("EEE", Locale.getDefault()) // Sen/Mon
+    val dateFormat = SimpleDateFormat("dd", Locale.getDefault()) // 01
+    val date = Date(dateMillis)
+
+    val backgroundColor = if (isSelected) TrainerBlue else Color.White
+    val contentColor = if (isSelected) Color.White else Color.Gray
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-            .background(Brush.verticalGradient(listOf(ScheduleBluePrimary, ScheduleBlueDark)))
-            .padding(20.dp)
+            .width(60.dp)
+            .height(80.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Column {
-            // Top Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White) }
-                    Spacer(Modifier.width(16.dp))
-                    Text("My Schedule", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-                Row {
-                    IconButton(onClick = {}) { Icon(Icons.Default.FilterList, null, tint = Color.White) }
-                    // Tombol Add di sini sudah diganti dengan FAB di Scaffold, tapi dipertahankan jika ingin di header juga
-                    IconButton(onClick = {}) { Icon(Icons.Default.Add, null, tint = Color.White) }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Stats Cards Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                HeaderStatItem(Icons.Default.DateRange, "$classesCount", "Classes This Week", Modifier.weight(1f))
-                Spacer(Modifier.width(8.dp))
-                HeaderStatItem(Icons.Outlined.Group, "N/A", "Total Booked", Modifier.weight(1f)) // Menggunakan N/A karena totalMembers tidak dihitung di ViewModel Anda
-                Spacer(Modifier.width(8.dp))
-                HeaderStatItem(Icons.Outlined.Schedule, "${totalHours}h", "Total Hours", Modifier.weight(1f))
-            }
+        Text(
+            text = dayFormat.format(date).uppercase(),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = contentColor.copy(alpha = 0.7f)
+        )
+        Text(
+            text = dateFormat.format(date),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = contentColor
+        )
+        if (isSelected) {
+            Box(Modifier.size(4.dp).background(Color.White, CircleShape))
         }
     }
 }
 
 @Composable
-fun HeaderStatItem(icon: ImageVector, value: String, label: String, modifier: Modifier) {
-    Box(
-        modifier = modifier
-            .height(100.dp)
-            .background(Color.White.copy(0.15f), RoundedCornerShape(16.dp))
-            .padding(12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(label, color = Color.White.copy(0.8f), fontSize = 10.sp, lineHeight = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        }
-    }
-}
-
-// --- COMPONENT: CALENDAR STRIP ---
-
-@Composable
-fun DateSelectorStrip(selectedDate: Long, onDateSelected: (Long) -> Unit) {
-    val dates = remember {
-        val list = mutableListOf<Calendar>()
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -3) // Start from 3 days ago
-        for (i in 0..13) {
-            list.add(cal.clone() as Calendar)
-            cal.add(Calendar.DAY_OF_YEAR, 1)
-        }
-        list
-    }
-
-    val selectedCal = Calendar.getInstance().apply { timeInMillis = selectedDate }
-
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(dates) { date ->
-            // Perbandingan tanggal tanpa mempertimbangkan waktu
-            val isSelected = date.get(Calendar.DAY_OF_YEAR) == selectedCal.get(Calendar.DAY_OF_YEAR) &&
-                    date.get(Calendar.YEAR) == selectedCal.get(Calendar.YEAR)
-
-            val dayName = SimpleDateFormat("EEE", Locale("id", "ID")).format(date.time).take(3) // Sab, Min, Sen
-            val dayNum = SimpleDateFormat("dd", Locale.getDefault()).format(date.time)
-
-            Column(
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(80.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSelected) ScheduleBluePrimary else Color.White)
-                    .clickable { onDateSelected(date.timeInMillis) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Indikator Dot untuk Hari Ini (Jika bukan hari yang dipilih)
-                if (isSelected) {
-                    Box(Modifier.size(4.dp).background(Color.White, CircleShape))
-                    Spacer(Modifier.height(4.dp))
-                }
-
-                Text(
-                    text = dayName,
-                    color = if (isSelected) Color.White.copy(0.8f) else Color.Gray,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = dayNum,
-                    color = if (isSelected) Color.White else Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            }
-        }
-    }
-}
-
-// --- COMPONENT: CLASS CARD ---
-@Composable
-fun ClassSessionCard(gymClass: GymClass, onClick: () -> Unit) {
+fun ScheduleCardItem(gymClass: GymClass, onClick: () -> Unit) {
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val start = timeFormat.format(Date(gymClass.startTimeMillis))
+    val startTime = timeFormat.format(Date(gymClass.startTimeMillis))
+    // Estimasi selesai
+    val endTime = timeFormat.format(Date(gymClass.startTimeMillis + (gymClass.durationMinutes * 60000)))
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(110.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize()
+        // Waktu
+        Column(
+            modifier = Modifier.width(60.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Left: Image
-            Box(
-                modifier = Modifier
-                    .width(110.dp)
-                    .fillMaxHeight()
-            ) {
-                // Logic load Base64 Image
-                val bitmap = remember(gymClass.imageUrl) {
-                    try {
-                        // Hilangkan prefix "data:image/jpeg;base64," jika ada
-                        val pureBase64 = gymClass.imageUrl.substringAfter(",")
-                        val bytes = Base64.decode(pureBase64, Base64.DEFAULT)
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    } catch (e: Exception) { null }
-                }
+            Text(startTime, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1E1E1E))
+            Text(endTime, fontSize = 12.sp, color = Color.Gray)
+        }
 
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
-                    )
-                } else {
-                    // Fallback Image
-                    Image(
-                        painter = painterResource(R.drawable.image3), // Pastikan R.drawable.image3 ada
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
-                    )
-                }
+        Spacer(Modifier.width(12.dp))
 
-                // Badge Jam (Biru di pojok kiri atas gambar)
+        // Kartu
+        Card(
+            modifier = Modifier.weight(1f),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F9FF)), // Biru sangat muda
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Row(modifier = Modifier.padding(12.dp)) {
+                // Gambar Kecil
                 Box(
                     modifier = Modifier
-                        .padding(8.dp)
-                        .background(ScheduleBluePrimary, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.LightGray)
                 ) {
-                    Text(start, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            // Right: Content
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(gymClass.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Schedule, null, tint = Color.Gray, modifier = Modifier.size(12.dp))
-                        Text(" ${gymClass.durationMinutes} minutes", color = Color.Gray, fontSize = 12.sp)
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Group, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
-                        Text(" ${gymClass.currentBookings}/${gymClass.capacity} participants", fontSize = 12.sp, color = Color.Gray)
-                        // TODO: Tambahkan Studio Room 2 di sini
+                    val bitmap = remember(gymClass.imageUrl) {
+                        try {
+                            val pureBase64 = gymClass.imageUrl.substringAfter(",")
+                            val bytes = Base64.decode(pureBase64, Base64.DEFAULT)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        } catch (e: Exception) { null }
                     }
 
-                    // Status Badge (Contoh: Upcoming)
-                    Surface(
-                        color = Color(0xFFE8F5E9),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            "Upcoming",
-                            color = Color(0xFF2E7D32),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        // Fallback image resource
+                        Image(
+                            painter = painterResource(id = R.drawable.image3),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
-            }
-        }
-    }
-}
 
-// --- COMPONENT: WEEK SUMMARY ---
-@Composable
-fun WeekSummaryCard(
-    totalClasses: Int,
-    totalHours: Int,
-    avgParticipants: Double,
-    attendanceRate: Double
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = ScheduleCardBg),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text("Week Summary", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.width(12.dp))
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                // Kolom Kiri
-                Column(modifier = Modifier.weight(1f)) {
-                    // Total Classes
-                    Text("Total Classes", color = Color.Gray, fontSize = 12.sp)
-                    Text("$totalClasses sessions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Avg Participants
-                    Text("Avg Participants", color = Color.Gray, fontSize = 12.sp)
-                    val formattedAvg = String.format(Locale.getDefault(), "%.1f", avgParticipants)
-                    Text("$formattedAvg per class", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                }
-
-                // Kolom Kanan
-                Column(modifier = Modifier.weight(1f)) {
-                    // Total Hours
-                    Text("Total Hours", color = Color.Gray, fontSize = 12.sp)
-                    Text("$totalHours hours", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Attendance Rate
-                    Text("Attendance Rate", color = Color.Gray, fontSize = 12.sp)
-                    val formattedRate = "${attendanceRate.toInt()}%"
-                    Text(formattedRate, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Column(verticalArrangement = Arrangement.Center, modifier = Modifier.height(60.dp)) {
+                    Text(gymClass.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1E1E1E), maxLines = 1)
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Schedule, null, tint = Color.Gray, modifier = Modifier.size(12.dp))
+                        Text(" ${gymClass.durationMinutes} min", fontSize = 12.sp, color = Color.Gray)
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Outlined.Group, null, tint = Color.Gray, modifier = Modifier.size(12.dp))
+                        Text(" ${gymClass.currentBookings}/${gymClass.capacity}", fontSize = 12.sp, color = Color.Gray)
+                    }
                 }
             }
         }
@@ -425,12 +294,28 @@ fun WeekSummaryCard(
 }
 
 @Composable
-fun EmptyScheduleState() {
+fun EmptyStateSchedule() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("No classes scheduled", color = Color.Gray)
-        Text("Tap '+' to add a class", color = ScheduleBluePrimary, fontSize = 12.sp, modifier = Modifier.clickable { /* TBD */ })
+        Icon(
+            imageVector = Icons.Default.CalendarMonth,
+            contentDescription = null,
+            tint = Color.LightGray,
+            modifier = Modifier.size(60.dp)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text("No classes scheduled", fontWeight = FontWeight.Bold, color = Color.Gray)
+        Text("Tap + to create a new class", fontSize = 12.sp, color = Color.LightGray)
     }
+}
+
+fun isSameDay(date1: Long, date2: Long): Boolean {
+    val cal1 = Calendar.getInstance().apply { timeInMillis = date1 }
+    val cal2 = Calendar.getInstance().apply { timeInMillis = date2 }
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }
