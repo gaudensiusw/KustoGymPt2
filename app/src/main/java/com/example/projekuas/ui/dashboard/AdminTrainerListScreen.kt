@@ -1,4 +1,4 @@
-package com.example.projekuas.ui.dashboard
+/*package com.example.projekuas.ui.dashboard
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -168,4 +168,4 @@ fun AdminUserCard(
             }
         }
     }
-}
+}*/

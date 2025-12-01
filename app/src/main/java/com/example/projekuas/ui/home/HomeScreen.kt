@@ -602,10 +602,10 @@ fun HomeNavHost(
             )
         }
         // Di dalam HomeNavHost, ganti placeholder ini:
-        composable("admin_manage") {
+        /*composable("admin_manage") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminMemberListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
-        }
+        }*/
         // [FIX] Tambahkan Route Admin Profile
         composable("admin_profile") {
             ProfileScreen(
@@ -747,7 +747,7 @@ fun HomeNavHost(
             MembershipScreen(viewModel = membershipViewModel, onNavigateBack = { navController.popBackStack() })
         }
 
-        composable("member_chat_list") {
+        /*composable("member_chat_list") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminMemberListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
         }
@@ -756,7 +756,7 @@ fun HomeNavHost(
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminTrainerListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
         }
-
+*/
         composable("admin_reports") {
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminReportsScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
