@@ -26,7 +26,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,110 +45,131 @@ fun TrainerScheduleScreen(
     onNavigateToClassForm: (String?) -> Unit
 ) {
     val viewModel: TrainerViewModel = viewModel(factory = factory)
+    // Mengambil state real-time dari ViewModel (yang terhubung ke Firebase)
     val state by viewModel.uiState.collectAsState()
 
-
-    val dates = remember {
-        (0..6).map {
-            java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_YEAR, it) }
-        }
-    }
-    var selectedDateIndex by remember { mutableIntStateOf(0) }
-    // Trigger refresh saat layar dibuka
+    // Trigger refresh data saat layar dibuka untuk memastikan sinkronisasi awal
     LaunchedEffect(Unit) { viewModel.refreshData() }
 
     Scaffold(
-        containerColor = Color(0xFFF5F9FF),
+        containerColor = TrainerBg,
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { onNavigateToClassForm(null) },
-                containerColor = Color(0xFF1E88E5), // Trainer Blue
+                onClick = { onNavigateToClassForm(null) }, // null = Mode Tambah Baru
+                containerColor = TrainerBlue,
                 contentColor = Color.White
             ) {
-                Icon(Icons.Default.Add, "Add Class")
+                Icon(Icons.Default.Add, contentDescription = "Add Class")
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // 1. HEADER TANGGAL (Bulan & Tahun dari Selected Date)
+            val headerDateFormatter = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+            val headerDate = headerDateFormatter.format(Date(state.selectedDate))
 
-            // Header
-            Text(
-                text = "My Schedule",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1E1E1E),
-                modifier = Modifier.padding(start = 24.dp, top = 40.dp, bottom = 20.dp)
-            )
-
-            // Date Strip (Horizontal Scroll)
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                items(dates.size) { index ->
-                    val date = dates[index]
-                    val isSelected = selectedDateIndex == index
-                    val bgColor = if (isSelected) Color(0xFF1E88E5) else Color.White
-                    val textColor = if (isSelected) Color.White else Color.Gray
+                Column {
+                    Text(
+                        text = "My Schedule",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = headerDate,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E1E1E)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = TrainerBlue,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
 
-                    Column(
-                        modifier = Modifier
-                            .width(60.dp)
-                            .height(80.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(bgColor)
-                            .clickable { selectedDateIndex = index }
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Hari (Sen, Sel, Rab)
-                        Text(
-                            text = java.text.SimpleDateFormat("EEE", java.util.Locale.getDefault()).format(date.time),
-                            color = textColor.copy(alpha = 0.8f),
-                            fontSize = 12.sp
-                        )
-                        // Tanggal (01, 02)
-                        Text(
-                            text = java.text.SimpleDateFormat("dd", java.util.Locale.getDefault()).format(date.time),
-                            color = textColor,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    }
+            // 2. CALENDAR STRIP (Scroll Horizontal)
+            // Generate 14 hari (2 hari lalu s/d 11 hari ke depan)
+            val dateList = remember {
+                val list = mutableListOf<Long>()
+                val cal = Calendar.getInstance()
+                cal.add(Calendar.DAY_OF_YEAR, -2)
+                for (i in 0..13) {
+                    list.add(cal.timeInMillis)
+                    cal.add(Calendar.DAY_OF_YEAR, 1)
+                }
+                list
+            }
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(dateList) { dateMillis ->
+                    DateSelectorItem(
+                        dateMillis = dateMillis,
+                        isSelected = isSameDay(dateMillis, state.selectedDate),
+                        onClick = { viewModel.onDateSelected(dateMillis) }
+                    )
                 }
             }
 
             Spacer(Modifier.height(24.dp))
 
-            // Class List
-            // Container Putih melengkung di bawah
+            // 3. LIST JADWAL (REALTIME DARI FIREBASE)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(Color.White)
+                    .background(
+                        color = Color.White,
+                        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+                    )
                     .padding(24.dp)
             ) {
+                val displayDate = SimpleDateFormat("EEEE, dd MMM", Locale.getDefault()).format(Date(state.selectedDate))
+
                 Text(
-                    text = "Classes",
-                    fontWeight = FontWeight.Bold,
+                    text = displayDate,
                     fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E1E1E),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // Gunakan LazyColumn untuk list
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = 80.dp), // Ruang untuk Floating Nav
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Contoh Item Jadwal (Ganti dengan data asli dari ViewModel nanti)
-                    items(3) {
-                        TrainerScheduleCard(
-                            time = "09:00 AM",
-                            title = "Yoga Flow",
-                            participants = "12/20"
-                        )
+                // Kondisi Loading, Kosong, atau Ada Data
+                if (state.isLoading) {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = TrainerBlue)
+                    }
+                } else if (state.filteredClasses.isEmpty()) {
+                    EmptyStateSchedule()
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // [PERBAIKAN UTAMA] Menggunakan data asli filteredClasses dari State
+                        items(state.filteredClasses) { gymClass ->
+                            ScheduleCardItem(
+                                gymClass = gymClass,
+                                onClick = {
+                                    // Kirim ID Kelas agar bisa diedit di ClassFormScreen
+                                    onNavigateToClassForm(gymClass.classId)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -158,49 +178,6 @@ fun TrainerScheduleScreen(
 }
 
 // --- KOMPONEN PENDUKUNG ---
-
-@Composable
-fun TrainerScheduleCard(time: String, title: String, participants: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Waktu
-        Text(
-            text = time,
-            fontWeight = FontWeight.Bold,
-            color = Color.Gray,
-            fontSize = 14.sp,
-            modifier = Modifier.width(70.dp)
-        )
-
-        // Kartu
-        Card(
-            modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F8FF)), // Biru sangat muda
-            elevation = CardDefaults.cardElevation(0.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .height(30.dp)
-                        .background(Color(0xFF1E88E5), RoundedCornerShape(2.dp))
-                )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(text = title, fontWeight = FontWeight.Bold, color = Color(0xFF1E1E1E))
-                    Spacer(Modifier.height(4.dp))
-                    Text(text = "$participants Participants", fontSize = 12.sp, color = Color.Gray)
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun DateSelectorItem(dateMillis: Long, isSelected: Boolean, onClick: () -> Unit) {
@@ -242,16 +219,17 @@ fun DateSelectorItem(dateMillis: Long, isSelected: Boolean, onClick: () -> Unit)
 
 @Composable
 fun ScheduleCardItem(gymClass: GymClass, onClick: () -> Unit) {
+    // Format Waktu dari Data Asli
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     val startTime = timeFormat.format(Date(gymClass.startTimeMillis))
-    // Estimasi selesai
+    // Hitung waktu selesai berdasarkan durasi
     val endTime = timeFormat.format(Date(gymClass.startTimeMillis + (gymClass.durationMinutes * 60000)))
 
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Waktu
+        // Kolom Waktu
         Column(
             modifier = Modifier.width(60.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -262,7 +240,7 @@ fun ScheduleCardItem(gymClass: GymClass, onClick: () -> Unit) {
 
         Spacer(Modifier.width(12.dp))
 
-        // Kartu
+        // Kartu Detail Kelas
         Card(
             modifier = Modifier.weight(1f),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F9FF)), // Biru sangat muda
@@ -270,7 +248,7 @@ fun ScheduleCardItem(gymClass: GymClass, onClick: () -> Unit) {
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Row(modifier = Modifier.padding(12.dp)) {
-                // Gambar Kecil
+                // Gambar Kecil (Thumbnail)
                 Box(
                     modifier = Modifier
                         .size(60.dp)
@@ -305,8 +283,15 @@ fun ScheduleCardItem(gymClass: GymClass, onClick: () -> Unit) {
 
                 Spacer(Modifier.width(12.dp))
 
+                // Detail Teks
                 Column(verticalArrangement = Arrangement.Center, modifier = Modifier.height(60.dp)) {
-                    Text(gymClass.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1E1E1E), maxLines = 1)
+                    Text(
+                        text = gymClass.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF1E1E1E),
+                        maxLines = 1
+                    )
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Schedule, null, tint = Color.Gray, modifier = Modifier.size(12.dp))

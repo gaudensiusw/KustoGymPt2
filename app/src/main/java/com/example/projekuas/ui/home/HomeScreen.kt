@@ -764,5 +764,13 @@ fun HomeNavHost(
             val adminViewModel: AdminViewModel = viewModel(factory = factory)
             AdminClassListScreen(viewModel = adminViewModel, onNavigateBack = { navController.popBackStack() })
         }
+
+        composable("admin_users") { // Sesuaikan nama rute dengan BottomNavItem
+            val adminViewModel: AdminViewModel = viewModel(factory = factory)
+            AdminDirectoryScreen(
+                viewModel = adminViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
     }
 }
