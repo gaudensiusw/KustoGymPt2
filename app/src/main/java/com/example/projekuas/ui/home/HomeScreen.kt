@@ -655,7 +655,8 @@ fun HomeNavHost(
                         onNavigateToReports = { navController.navigate("admin_reports") },
                         onNavigateToTrainers = { navController.navigate("trainer_list") },
                         onNavigateToChat = { navController.navigate("member_chat_list") },
-                        onNavigateToClasses = { navController.navigate("admin_class_list") } // Route Baru
+                        onNavigateToClasses = { navController.navigate("admin_class_list") },
+                        onLogout
                     )
                 }
                 "Trainer" -> {
