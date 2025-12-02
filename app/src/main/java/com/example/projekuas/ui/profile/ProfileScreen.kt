@@ -41,53 +41,48 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.example.projekuas.R
 import com.example.projekuas.viewmodel.ProfileViewModel
+import com.example.projekuas.ui.theme.* // Import semua warna dari Color.kt
 import java.text.SimpleDateFormat
-import java.util.Date // PENTING: Import Date
+import java.util.Date
 import java.util.Locale
 
-val fitnessLevels = listOf("Pemula", "Menengah", "Mahir")
-
-val AdminGreen = Color(0xFF4CAF50)
-val TrainerBlue = Color(0xFF1E88E5)
+val fitnessLevels = listOf("Beginner", "Intermediate", "Pro")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel,
-    userRole: String = "Member",
+    // [HAPUS] userRole dihapus dari sini karena kita ambil langsung dari ViewModel
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.userProfile
 
+    // [BARU] Ambil Role langsung dari data profil yang sedang login
+    // Jika data belum masuk (loading), default ke "Member"
+    val userRole = if (profile.role.isNotBlank()) profile.role else "Member"
+
     // --- LOGIKA WARNA DINAMIS ---
-    val primaryColor = when (userRole.lowercase()) {
-        "admin" -> AdminGreen
-        "trainer" -> TrainerBlue
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val darkPrimaryColor = when (userRole.lowercase()) {
-        "admin" -> Color(0xFF2E7D32)
-        "trainer" -> Color(0xFF1565C0)
-        else -> MaterialTheme.colorScheme.primaryContainer
+    // Sekarang warnanya akan bereaksi terhadap perubahan data 'profile.role'
+    val (primaryColor, darkPrimaryColor) = when (userRole.lowercase()) {
+        "admin" -> GymGreen to GymGreenDark
+        "trainer" -> GymBlue to GymBlueDark
+        else -> GymPurple to GymPurpleDark // Default Member
     }
 
     // --- PERBAIKAN DATA UNTUK TAMPILAN ---
 
-    // 1. Konversi Long (dateOfBirthMillis) ke String untuk ditampilkan
     val dobString = remember(profile.dateOfBirthMillis) {
-        if (profile.dateOfBirthMillis > 0) {
+        if (profile.dateOfBirthMillis > 0L) { // Pakai 0L untuk Long
             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(profile.dateOfBirthMillis))
         } else {
             ""
         }
     }
 
-    // 2. Null Safety untuk Phone Number
     val phoneString = profile.phoneNumber ?: ""
 
-    // 3. Kalkulasi BMI
     val heightVal = profile.heightCm
     val weightVal = profile.weightKg
     val heightM = if (heightVal > 0) heightVal / 100.0 else 1.0
@@ -96,19 +91,17 @@ fun ProfileScreen(
 
     val bmiStatus = when {
         bmiValue == 0.0 -> "Belum ada data" to MaterialTheme.colorScheme.onSurfaceVariant
-        bmiValue < 18.5 -> "Underweight" to Color(0xFF2196F3)
-        bmiValue < 25.0 -> "Normal" to Color(0xFF4CAF50)
-        bmiValue < 30.0 -> "Overweight" to Color(0xFFFFC107)
+        bmiValue < 18.5 -> "Underweight" to GymBlue
+        bmiValue < 25.0 -> "Normal" to GymGreen
+        bmiValue < 30.0 -> "Overweight" to GymOrange
         else -> "Obesity" to Color.Red
     }
 
-    // State Lokal
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showEditSheet by remember { mutableStateOf(false) }
-
-    // State Lokal untuk Inputan DOB (agar tidak error saat user mengetik)
     var dobInput by remember { mutableStateOf(dobString) }
-    // Update dobInput jika data dari DB berubah
+
+    // Update dobInput jika data dari DB selesai dimuat
     LaunchedEffect(dobString) {
         if (dobString.isNotBlank()) dobInput = dobString
     }
@@ -154,7 +147,11 @@ fun ProfileScreen(
                             .fillMaxWidth()
                             .height(350.dp)
                             .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
-                            .background(Brush.verticalGradient(listOf(primaryColor, darkPrimaryColor)))
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(primaryColor, darkPrimaryColor)
+                                )
+                            )
                     ) {
                         Column(
                             modifier = Modifier.fillMaxSize().padding(top = 40.dp, start = 20.dp, end = 20.dp),
@@ -212,8 +209,16 @@ fun ProfileScreen(
                             Text(text = profile.email, fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
 
                             Spacer(Modifier.height(8.dp))
+
+                            // LABEL ROLE PENGGUNA (Menggunakan userRole yang didapat dari DB)
                             Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                                Text(text = userRole.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                Text(
+                                    text = userRole.uppercase(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
                             }
                         }
                     }
@@ -229,7 +234,7 @@ fun ProfileScreen(
                 }
             }
 
-            // BMI
+            // BMI CARD
             item {
                 Spacer(modifier = Modifier.height(10.dp))
                 Card(
@@ -315,6 +320,81 @@ fun ProfileScreen(
         )
     }
 
+    // EDIT SHEET (Bagian ini tidak berubah, hanya formatting kecil)
+    if (showEditSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showEditSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 50.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text("Edit Profil", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 20.dp))
+
+                EditTextField(label = "Full Name", value = profile.name, onValueChange = viewModel::onNameChange, activeColor = primaryColor)
+                Spacer(Modifier.height(12.dp))
+
+                EditTextField(label = "Phone Number", value = phoneString, onValueChange = viewModel::onPhoneChange, activeColor = primaryColor, keyboardType = KeyboardType.Phone)
+                Spacer(Modifier.height(12.dp))
+
+                EditTextField(label = "Address", value = profile.address, onValueChange = viewModel::onAddressChange, activeColor = primaryColor)
+                Spacer(Modifier.height(12.dp))
+
+                EditTextField(
+                    label = "Date of Birth (YYYY-MM-DD)",
+                    value = dobInput,
+                    onValueChange = {
+                        dobInput = it
+                        viewModel.onDobChange(it)
+                    },
+                    activeColor = primaryColor,
+                    keyboardType = KeyboardType.Number
+                )
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = profile.gender.ifBlank { "Not Set" },
+                    onValueChange = {},
+                    label = { Text("Gender (Locked)") },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    enabled = false
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    EditTextField(label = "Height (cm)", value = if (profile.heightCm > 0) profile.heightCm.toString() else "", onValueChange = viewModel::onHeightChange, activeColor = primaryColor, keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                    EditTextField(label = "Weight (kg)", value = if (profile.weightKg > 0) profile.weightKg.toString() else "", onValueChange = viewModel::onWeightChange, activeColor = primaryColor, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(12.dp))
+
+                LevelFitnessDropdown(profile.fitnessLevel, primaryColor, viewModel::onFitnessLevelSelected)
+                Spacer(Modifier.height(24.dp))
+
+                Button(
+                    onClick = { viewModel.saveProfile() },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !uiState.isSaving,
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                ) {
+                    if (uiState.isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Text("Simpan Perubahan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                Text("Cooldown 1 jam setiap kali menyimpan profil.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
+
+
     // EDIT SHEET
     if (showEditSheet) {
         ModalBottomSheet(
@@ -339,7 +419,6 @@ fun ProfileScreen(
                 EditTextField(label = "Address", value = profile.address, onValueChange = viewModel::onAddressChange, primaryColor)
                 Spacer(Modifier.height(12.dp))
 
-                // Menggunakan Local State 'dobInput' agar user bisa mengetik tanggal manual tanpa format reset otomatis
                 EditTextField(
                     label = "Date of Birth (YYYY-MM-DD)",
                     value = dobInput,
@@ -391,6 +470,7 @@ fun ProfileScreen(
     }
 }
 
+// ... Sisa fungsi helper (EditTextField, StatFloatingCard, dll) sama seperti sebelumnya ...
 @Composable
 fun EditTextField(label: String, value: String, onValueChange: (String) -> Unit, activeColor: Color, keyboardType: KeyboardType = KeyboardType.Text, modifier: Modifier = Modifier.fillMaxWidth()) {
     OutlinedTextField(
