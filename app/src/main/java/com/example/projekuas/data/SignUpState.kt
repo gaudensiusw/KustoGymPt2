@@ -6,6 +6,7 @@ data class SignUpState(
     val username: String = "",
     val email: String = "",
     val password: String = "",
+    val confirmPassword: String = "", // Tambahan untuk UI
 
     // Kriteria Profil
     val height: String = "", // Simpan sebagai String dulu untuk input teks
@@ -17,8 +18,15 @@ data class SignUpState(
     val weightKg: String = "",
     val dob: String = "",        // Tanggal Lahir (String)
     val phoneNumber: String = "",// Nomor Telepon
+
+    // Validasi Error per Field (Agar UI bisa menampilkan error merah di bawah input)
+    val nameError: String? = null,
+    val emailError: String? = null,
+    val passwordError: String? = null,
+    val confirmPasswordError: String? = null,
+
     // Status
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isRegistrationSuccessful: Boolean = false
+    val isSignUpSuccessful: Boolean = false // Diganti agar konsisten dengan UI
 )

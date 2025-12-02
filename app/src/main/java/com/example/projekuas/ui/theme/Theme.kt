@@ -10,48 +10,97 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = GymPurple,
+// --- 1. MEMBER SCHEMES (UNGU) ---
+private val MemberDarkScheme = darkColorScheme(
+    primary = GymPurpleDark,      // Ungu Gelap
     secondary = GymOrange,
     background = BackgroundDark,
-    surface = SurfaceDark, // Kartu jadi gelap
+    surface = SurfaceDark,
+    surfaceContainer = SurfaceDark,
     onPrimary = TextWhite,
-    onBackground = TextWhite,
     onSurface = TextWhite
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = GymPurple,
+private val MemberLightScheme = lightColorScheme(
+    primary = GymPurple,          // Ungu Terang
     secondary = GymOrange,
     background = BackgroundLight,
-    surface = SurfaceLight, // Kartu jadi putih
+    surface = SurfaceLight,
+    surfaceContainer = SurfaceLight,
     onPrimary = TextWhite,
-    onBackground = TextBlack,
+    onSurface = TextBlack
+)
+
+// --- 2. TRAINER SCHEMES (BIRU) ---
+private val TrainerDarkScheme = darkColorScheme(
+    primary = GymBlueDark,        // Biru Tua
+    secondary = GymOrange,
+    background = BackgroundDark,
+    surface = SurfaceDark,
+    surfaceContainer = SurfaceDark,
+    onPrimary = TextWhite,
+    onSurface = TextWhite
+)
+
+private val TrainerLightScheme = lightColorScheme(
+    primary = GymBlue,            // Biru Cerah
+    secondary = GymOrange,
+    background = BackgroundLight,
+    surface = SurfaceLight,
+    surfaceContainer = SurfaceLight,
+    onPrimary = TextWhite,
+    onSurface = TextBlack
+)
+
+// --- 3. ADMIN SCHEMES (HIJAU) ---
+private val AdminDarkScheme = darkColorScheme(
+    primary = GymGreenDark,       // Hijau Tua
+    secondary = GymOrange,
+    background = BackgroundDark,
+    surface = SurfaceDark,
+    surfaceContainer = SurfaceDark,
+    onPrimary = TextWhite,
+    onSurface = TextWhite
+)
+
+private val AdminLightScheme = lightColorScheme(
+    primary = GymGreen,           // Hijau Segar
+    secondary = GymOrange,
+    background = BackgroundLight,
+    surface = SurfaceLight,
+    surfaceContainer = SurfaceLight,
+    onPrimary = TextWhite,
     onSurface = TextBlack
 )
 
 @Composable
 fun ProjekUASTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    userRole: String? = "Member", // Parameter Kunci
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    // Logika Pemilihan Warna
+    val colorScheme = when (userRole) {
+        "Trainer" -> if (darkTheme) TrainerDarkScheme else TrainerLightScheme
+        "Admin" -> if (darkTheme) AdminDarkScheme else AdminLightScheme
+        else -> if (darkTheme) MemberDarkScheme else MemberLightScheme // Default: Member
+    }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // 2. SET STATUS BAR TRANSPARAN
             window.statusBarColor = Color.Transparent.toArgb()
-            window.navigationBarColor = Color.Transparent.toArgb() // Nav bar bawah juga transparan
+            window.navigationBarColor = Color.Transparent.toArgb()
 
-            // Atur warna ikon status bar (gelap/terang)
+            // Ikon status bar: Putih jika dark mode / background gelap, Hitam jika light mode
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = Typography, // Pastikan Anda punya file Type.kt
         content = content
     )
 }

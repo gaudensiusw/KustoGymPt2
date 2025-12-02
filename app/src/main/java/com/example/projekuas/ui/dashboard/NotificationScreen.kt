@@ -26,7 +26,7 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationScreen(onNavigateBack: () -> Unit) {
+fun NotificationScreen(onNavigateBack: () -> Unit ) {
     val repo = remember { NotificationRepository(Firebase.firestore) }
     val userId = Firebase.auth.currentUser?.uid ?: ""
     // Gunakan coroutine scope untuk aksi hapus

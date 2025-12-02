@@ -1,4 +1,4 @@
-/*package com.example.projekuas.ui.dashboard
+package com.example.projekuas.ui.dashboard
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -97,7 +97,7 @@ fun AdminTrainerListScreen(
 
 // --- PERBAIKAN: Definisi AdminUserCard disesuaikan ---
 @Composable
-fun AdminUserCard(
+fun AdminTrainerCard(
     user: UserProfile,      // Menerima object UserProfile, bukan string terpisah
     iconColor: Color,
     onDeleteClick: () -> Unit, // Nama parameter disesuaikan
@@ -168,4 +168,4 @@ fun AdminUserCard(
             }
         }
     }
-}*/
+}

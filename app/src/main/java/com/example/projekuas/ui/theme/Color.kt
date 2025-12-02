@@ -22,6 +22,9 @@ val BgGray = Color(0xFFF7F8F8)
 val CardBg = Color(0xFFFFFFFF)
 val GreenStatus = Color(0xFF4CAF50)
 
+val GymBlue = Color(0xFF2196F3)        // Light Mode (Biru Cerah)
+val GymBlueDark = Color(0xFF0D47A1)
+
 // Light Mode Colors
 val BackgroundLight = Color(0xFFF5F5F5) // Abu terang
 val SurfaceLight = Color(0xFFFFFFFF) // Putih untuk kartu
@@ -37,3 +40,4 @@ val SurfaceColor = Color(0xFFF5F5F5)
 val AdminPrimaryColor = Color(0xFF4CAF50)      // Hijau Utama
 val AdminBgColor = Color(0xFFF5F7FA)           // Abu-abu sangat muda (Background)
 val CardBgColor = Color.White                  // Warna kartu putih bersih
+val ErrorRed = Color(0xFFB00020)       // Untuk tombol hapus notifikasi

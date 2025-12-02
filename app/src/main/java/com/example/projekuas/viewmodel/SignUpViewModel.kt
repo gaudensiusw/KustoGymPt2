@@ -4,119 +4,94 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.projekuas.data.AuthRepository
 import com.example.projekuas.data.SignUpState
-import com.example.projekuas.data.UserProfile // Wajib: Import UserProfile
+import com.example.projekuas.data.UserProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class SignUpViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
-    private val _state = MutableStateFlow(SignUpState())
-    val state: StateFlow<SignUpState> = _state
+    private val _uiState = MutableStateFlow(SignUpState())
+    val uiState: StateFlow<SignUpState> = _uiState.asStateFlow()
 
-    // --- HANDLER KREDENSIAL UTAMA ---
+    // --- INPUT HANDLERS ---
     fun onNameChange(newName: String) {
-        _state.update { it.copy(name = newName, error = null) }
+        _uiState.update { it.copy(name = newName, nameError = null) }
     }
 
     fun onEmailChange(newEmail: String) {
-        _state.update { it.copy(email = newEmail, error = null) }
+        _uiState.update { it.copy(email = newEmail, emailError = null) }
     }
 
     fun onPasswordChange(newPassword: String) {
-        _state.update { it.copy(password = newPassword, error = null) }
+        _uiState.update { it.copy(password = newPassword, passwordError = null) }
     }
 
-    // --- FIX: TAMBAHKAN HANDLER UNTUK FIELD YANG HILANG ---
-    fun onHeightChange(newHeight: String) {
-        _state.update { it.copy(heightCm = newHeight, error = null) }
+    fun onConfirmPasswordChange(newConfirm: String) {
+        _uiState.update { it.copy(confirmPassword = newConfirm, confirmPasswordError = null) }
     }
 
-    fun onWeightChange(newWeight: String) {
-        _state.update { it.copy(weightKg = newWeight, error = null) }
-    }
+    // --- LOGIC SIGN UP ---
+    fun signUp() {
+        val currentState = _uiState.value
+        var hasError = false
 
-    fun onDobChange(newDob: String) {
-        _state.update { it.copy(dob = newDob, error = null) }
-    }
+        // 1. Validasi Nama
+        if (currentState.name.isBlank()) {
+            _uiState.update { it.copy(nameError = "Nama tidak boleh kosong") }
+            hasError = true
+        }
 
-    fun onPhoneChange(newPhone: String) {
-        _state.update { it.copy(phoneNumber = newPhone, error = null) }
-    }
+        // 2. Validasi Email
+        if (currentState.email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(currentState.email).matches()) {
+            _uiState.update { it.copy(emailError = "Format email tidak valid") }
+            hasError = true
+        }
 
-    fun onAddressChange(newAddress: String) {
-        _state.update { it.copy(address = newAddress, error = null) }
-    }
+        // 3. Validasi Password
+        if (currentState.password.length < 6) {
+            _uiState.update { it.copy(passwordError = "Password minimal 6 karakter") }
+            hasError = true
+        }
 
-    fun setGender(newGender: String) {
-        _state.update { it.copy(gender = newGender) }
-    }
-    // --- AKHIR HANDLER BARU ---
+        // 4. Validasi Konfirmasi Password
+        if (currentState.password != currentState.confirmPassword) {
+            _uiState.update { it.copy(confirmPasswordError = "Password tidak cocok") }
+            hasError = true
+        }
 
+        if (hasError) return
 
-    // Logika Registrasi
-    fun register() {
+        // Jika Lolos Validasi, Lanjut ke Firebase
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-
-            val currentState = _state.value
-
-            // --- VALIDASI DASAR ---
-            if (currentState.name.isBlank() || currentState.email.isBlank() || currentState.password.length < 6) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "Nama, Email, dan Password minimal 6 karakter wajib diisi."
-                    )
-                }
-                return@launch
-            }
-
-            // FIX PENTING: Kompilasi semua data menjadi objek UserProfile
-            val userProfileData = UserProfile(
-                // Data Kredensial & Dasar
-                name = currentState.name,
-                email = currentState.email,
-                username = currentState.name, // Menggunakan nama sebagai username default
-
-                // Data Fisik: Konversi String UI ke Double untuk Database
-                heightCm = currentState.heightCm.toDoubleOrNull() ?: 0.0,
-                weightKg = currentState.weightKg.toDoubleOrNull() ?: 0.0,
-
-                // Data Lain
-                // Catatan: Konversi DOB (String) ke Long harus dilakukan di sini
-                dateOfBirthMillis = 0L, // FIX: Menggunakan 0L sementara waktu
-                gender = currentState.gender,
-                phoneNumber = currentState.phoneNumber, // FIX: Menggunakan phoneNumber dari state
-                address = currentState.address,
-
-                // Set default role dan level
-                role = "Member",
-                fitnessLevel = "Pemula",
-                targetWeightKg = 0.0 // Target awal
-            )
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                // FIX: Panggil REPOSITORY dengan tanda tangan fungsi yang benar
-                // Argumen: (email, password, UserProfile)
-                authRepository.signUp(currentState.email, currentState.password, userProfileData)
+                // Buat objek UserProfile standar untuk member baru
+                // Data fisik (tinggi/berat) di-set 0 atau default, user isi nanti di profile
+                val newUserProfile = UserProfile(
+                    name = currentState.name,
+                    email = currentState.email,
+                    username = currentState.email.substringBefore("@"), // Generate username dari email
+                    role = "Member",
+                    fitnessLevel = "Pemula",
+                    targetWeightKg = 0.0,
+                    heightCm = 0.0,
+                    weightKg = 0.0,
+                    gender = "",
+                    dateOfBirthMillis = 0L
+                )
 
-                // Jika berhasil tanpa exception
-                _state.update { it.copy(isLoading = false, isRegistrationSuccessful = true) }
+                authRepository.signUp(currentState.email, currentState.password, newUserProfile)
+                _uiState.update { it.copy(isLoading = false, isSignUpSuccessful = true) }
 
             } catch (e: Exception) {
-                // Tangkap error dari Firebase/Firestore
-                val errorMessage = when {
-                    e.message?.contains("email address is already in use") == true -> "Email sudah terdaftar."
-                    e.message?.contains("password is too weak") == true -> "Password terlalu lemah."
-                    else -> "Pendaftaran Gagal: ${e.message}"
-                }
-
-                _state.update {
+                _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = errorMessage
+                        error = e.message ?: "Terjadi kesalahan saat mendaftar"
                     )
                 }
             }

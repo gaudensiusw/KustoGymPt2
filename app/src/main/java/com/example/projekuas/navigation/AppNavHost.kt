@@ -163,11 +163,13 @@ fun AppNavHost(
         // --- Rute Sign Up ---
         composable(NavDestinations.SIGN_UP) {
             SignUpScreen(
-                viewModel = viewModel(factory = authFactory),
-                onNavigateBackToLogin = { navController.popBackStack() },
-                onRegistrationSuccess = {
+                // PERBAIKAN: Gunakan 'homeFactory' (sesuai nama variabel di atas), bukan 'factory'
+                factory = homeFactory,
+
+                // Callback navigasi baru sesuai SignUpScreen yang sudah diupdate
+                onNavigateToLogin = {
                     navController.navigate(NavDestinations.LOGIN) {
-                        popUpTo(NavDestinations.LOGIN) { inclusive = true }
+                        popUpTo(NavDestinations.SIGN_UP) { inclusive = true }
                     }
                 }
             )
