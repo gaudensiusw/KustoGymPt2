@@ -11,12 +11,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
-// Wrapper Class untuk State UI agar Data User terpisah dari Status Loading/Error
+// Wrapper Class untuk State UI
 data class ProfileUiState(
     val userProfile: UserProfile = UserProfile(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val isSaving: Boolean = false,
+    val error: String? = null,
+    val successMessage: String? = null
 )
 
 class ProfileViewModel(
@@ -27,12 +31,13 @@ class ProfileViewModel(
     private val currentUserId = authRepository.getCurrentUserId() ?: ""
     private val currentUserEmail = authRepository.getCurrentUserEmail() ?: ""
 
-    // Menggunakan UiState sebagai Single Source of Truth
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
+    // Variable untuk cooldown update (1 jam)
+    private var lastUpdateTimestamp: Long = 0
+
     init {
-        // Set data awal minimal (ID & Email) sebelum load dari DB
         _uiState.update {
             it.copy(userProfile = UserProfile(userId = currentUserId, email = currentUserEmail))
         }
@@ -44,45 +49,19 @@ class ProfileViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-
-            // Mengamati perubahan profil secara real-time dari Repository
-            profileRepository.getCurrentUserProfile(currentUserId)
-                .collect { profileFromDb ->
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            // Gabungkan data DB dengan email auth yang valid
-                            userProfile = profileFromDb.copy(email = currentUserEmail),
-                            isLoading = false
-                        )
+            try {
+                profileRepository.getCurrentUserProfile(currentUserId)
+                    .collect { profileFromDb ->
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                // Gabungkan data DB dengan email auth
+                                userProfile = profileFromDb.copy(email = currentUserEmail),
+                                isLoading = false
+                            )
+                        }
                     }
-                }
-        }
-    }
-
-    // --- FITUR BARU: GANTI FOTO PROFIL ---
-
-    fun updateProfilePicture(uri: Uri) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-
-            // 1. Upload ke Firebase Storage
-            val downloadUrl = profileRepository.uploadProfileImage(uri)
-
-            if (downloadUrl != null) {
-                // 2. Update URL di object UserProfile lokal
-                val updatedProfile = _uiState.value.userProfile.copy(profilePictureUrl = downloadUrl)
-
-                // 3. Simpan perubahan URL ke Firestore
-                profileRepository.saveUserProfile(updatedProfile)
-
-                // Update state UI
-                _uiState.update {
-                    it.copy(userProfile = updatedProfile, isLoading = false)
-                }
-            } else {
-                _uiState.update {
-                    it.copy(isLoading = false, error = "Gagal mengupload gambar.")
-                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
         }
     }
@@ -90,68 +69,110 @@ class ProfileViewModel(
     // --- HANDLER INPUT (FORMULIR) ---
 
     fun onNameChange(newName: String) {
-        _uiState.update {
-            it.copy(userProfile = it.userProfile.copy(name = newName), error = null)
-        }
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(name = newName)) }
     }
 
-    fun onWeightChange(newWeight: String) {
-        val kg = newWeight.toDoubleOrNull() ?: 0.0
-        _uiState.update {
-            it.copy(userProfile = it.userProfile.copy(weightKg = kg), error = null)
+    fun onEmailChange(newEmail: String) {
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(email = newEmail)) }
+    }
+
+    fun onPhoneChange(newPhone: String) {
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(phoneNumber = newPhone)) }
+    }
+
+    fun onAddressChange(newAddress: String) {
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(address = newAddress)) }
+    }
+
+    // [PERBAIKAN] Konversi String input ke Long untuk dateOfBirthMillis
+    fun onDobChange(newDob: String) {
+        try {
+            // Mencoba parsing format YYYY-MM-DD
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val date = sdf.parse(newDob)
+            val millis = date?.time ?: 0L
+
+            _uiState.update {
+                it.copy(userProfile = it.userProfile.copy(dateOfBirthMillis = millis))
+            }
+        } catch (e: Exception) {
+            // Jika format belum valid (sedang mengetik), jangan update dulu atau biarkan 0
         }
     }
 
     fun onHeightChange(newHeight: String) {
         val cm = newHeight.toDoubleOrNull() ?: 0.0
-        _uiState.update {
-            it.copy(userProfile = it.userProfile.copy(heightCm = cm), error = null)
-        }
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(heightCm = cm)) }
+    }
+
+    fun onWeightChange(newWeight: String) {
+        val kg = newWeight.toDoubleOrNull() ?: 0.0
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(weightKg = kg)) }
     }
 
     fun onFitnessLevelSelected(level: String) {
-        _uiState.update {
-            it.copy(userProfile = it.userProfile.copy(fitnessLevel = level))
+        _uiState.update { it.copy(userProfile = it.userProfile.copy(fitnessLevel = level)) }
+    }
+
+    // --- FITUR GANTI FOTO ---
+    fun updateProfilePicture(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val downloadUrl = profileRepository.uploadProfileImage(uri)
+
+            if (downloadUrl != null) {
+                val updatedProfile = _uiState.value.userProfile.copy(profilePictureUrl = downloadUrl)
+                profileRepository.saveUserProfile(updatedProfile)
+                _uiState.update {
+                    it.copy(userProfile = updatedProfile, isLoading = false, successMessage = "Foto berhasil diperbarui!")
+                }
+            } else {
+                _uiState.update { it.copy(isLoading = false, error = "Gagal mengupload gambar.") }
+            }
         }
     }
 
-    // --- LOGIKA SIMPAN PERUBAHAN TEXT ---
-
+    // --- LOGIKA SIMPAN ---
     fun saveProfile() {
+        val currentTime = System.currentTimeMillis()
+        val oneHourMillis = 60 * 60 * 1000
+
+        // Cek Cooldown
+        if (currentTime - lastUpdateTimestamp < oneHourMillis) {
+            val remainingMinutes = (oneHourMillis - (currentTime - lastUpdateTimestamp)) / 1000 / 60
+            _uiState.update { it.copy(error = "Tunggu $remainingMinutes menit lagi untuk update profil.") }
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isSaving = true, error = null, successMessage = null) }
 
             val currentProfile = _uiState.value.userProfile
 
-            // Validasi sederhana
             if (currentProfile.name.isBlank()) {
-                _uiState.update { it.copy(isLoading = false, error = "Nama tidak boleh kosong.") }
+                _uiState.update { it.copy(isSaving = false, error = "Nama tidak boleh kosong.") }
                 return@launch
             }
 
             try {
-                // Simpan ke Firestore
                 profileRepository.saveUserProfile(currentProfile)
+                lastUpdateTimestamp = System.currentTimeMillis()
 
-                // Delay sedikit untuk efek visual
                 kotlinx.coroutines.delay(500)
-
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(isSaving = false, successMessage = "Profil berhasil disimpan!") }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "Gagal menyimpan: ${e.message}") }
+                _uiState.update { it.copy(isSaving = false, error = "Gagal menyimpan: ${e.message}") }
             }
         }
     }
 
-    // --- LOGIKA LOGOUT ---
+    fun clearMessages() {
+        _uiState.update { it.copy(error = null, successMessage = null) }
+    }
 
     fun logout() {
         viewModelScope.launch {
-            try {
-                authRepository.signOut()
-            } catch (e: Exception) {
-                // Log error jika perlu
-            }
+            try { authRepository.signOut() } catch (e: Exception) {}
         }
     }
 }

@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
@@ -39,11 +41,12 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.example.projekuas.R
 import com.example.projekuas.viewmodel.ProfileViewModel
+import java.text.SimpleDateFormat
+import java.util.Date // PENTING: Import Date
+import java.util.Locale
 
-// Data Dropdown Global
 val fitnessLevels = listOf("Pemula", "Menengah", "Mahir")
 
-// Warna Khusus Role
 val AdminGreen = Color(0xFF4CAF50)
 val TrainerBlue = Color(0xFF1E88E5)
 
@@ -51,36 +54,44 @@ val TrainerBlue = Color(0xFF1E88E5)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel,
-    userRole: String = "Member", // Parameter Role Ditambahkan
+    userRole: String = "Member",
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit
 ) {
-    // 1. Ambil State dari ViewModel
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.userProfile
 
-    // --- LOGIKA WARNA DINAMIS BERDASARKAN ROLE ---
+    // --- LOGIKA WARNA DINAMIS ---
     val primaryColor = when (userRole.lowercase()) {
         "admin" -> AdminGreen
         "trainer" -> TrainerBlue
-        else -> MaterialTheme.colorScheme.primary // Default Member
+        else -> MaterialTheme.colorScheme.primary
     }
-
     val darkPrimaryColor = when (userRole.lowercase()) {
         "admin" -> Color(0xFF2E7D32)
         "trainer" -> Color(0xFF1565C0)
         else -> MaterialTheme.colorScheme.primaryContainer
     }
 
-    // State Lokal UI
-    var showLogoutDialog by remember { mutableStateOf(false) }
-    var showEditSheet by remember { mutableStateOf(false) }
+    // --- PERBAIKAN DATA UNTUK TAMPILAN ---
 
-    // 2. Logic Kalkulasi Data (BMI & Status)
-    val heightM = if (profile.heightCm > 0) profile.heightCm.toDouble() / 100.0 else 1.0
-    val weightKg = profile.weightKg.toDouble()
+    // 1. Konversi Long (dateOfBirthMillis) ke String untuk ditampilkan
+    val dobString = remember(profile.dateOfBirthMillis) {
+        if (profile.dateOfBirthMillis > 0) {
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(profile.dateOfBirthMillis))
+        } else {
+            ""
+        }
+    }
 
-    val bmiValue = if (weightKg > 0) weightKg / (heightM * heightM) else 0.0
+    // 2. Null Safety untuk Phone Number
+    val phoneString = profile.phoneNumber ?: ""
+
+    // 3. Kalkulasi BMI
+    val heightVal = profile.heightCm
+    val weightVal = profile.weightKg
+    val heightM = if (heightVal > 0) heightVal / 100.0 else 1.0
+    val bmiValue = if (weightVal > 0) weightVal / (heightM * heightM) else 0.0
     val bmiFormatted = String.format("%.1f", bmiValue)
 
     val bmiStatus = when {
@@ -91,7 +102,33 @@ fun ProfileScreen(
         else -> "Obesity" to Color.Red
     }
 
-    // 3. Launcher Ganti Foto
+    // State Lokal
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showEditSheet by remember { mutableStateOf(false) }
+
+    // State Lokal untuk Inputan DOB (agar tidak error saat user mengetik)
+    var dobInput by remember { mutableStateOf(dobString) }
+    // Update dobInput jika data dari DB berubah
+    LaunchedEffect(dobString) {
+        if (dobString.isNotBlank()) dobInput = dobString
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+    }
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            showEditSheet = false
+            viewModel.clearMessages()
+        }
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -100,42 +137,29 @@ fun ProfileScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {}
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = 20.dp),
-            contentPadding = PaddingValues(bottom = 20.dp)
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-
-            // --- BAGIAN 1: HEADER WARNA DINAMIS + KARTU STATISTIK ---
+            // HEADER
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(430.dp)
-                ) {
-                    // A. Background Melengkung (Warna mengikuti Role)
+                Box(modifier = Modifier.fillMaxWidth().height(430.dp)) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(350.dp)
                             .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(primaryColor, darkPrimaryColor)
-                                )
-                            )
+                            .background(Brush.verticalGradient(listOf(primaryColor, darkPrimaryColor)))
                     ) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = 40.dp, start = 20.dp, end = 20.dp),
+                            modifier = Modifier.fillMaxSize().padding(top = 40.dp, start = 20.dp, end = 20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Row Navigasi Atas
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -144,21 +168,14 @@ fun ProfileScreen(
                                 IconButton(onClick = onNavigateBack) {
                                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                                 }
-                                Text(
-                                    text = "Profile",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                // Tombol Edit
+                                Text("Profile", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 IconButton(onClick = { showEditSheet = true }) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit Profile", tint = Color.White)
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Foto Profil
                             Box(contentAlignment = Alignment.Center) {
                                 val imageModifier = Modifier
                                     .size(100.dp)
@@ -167,23 +184,11 @@ fun ProfileScreen(
                                     .clickable { imagePickerLauncher.launch("image/*") }
 
                                 if (profile.profilePictureUrl.startsWith("data:image")) {
-                                    val bitmap = remember(profile.profilePictureUrl) {
-                                        base64ToBitmap(profile.profilePictureUrl)
-                                    }
+                                    val bitmap = remember(profile.profilePictureUrl) { base64ToBitmap(profile.profilePictureUrl) }
                                     if (bitmap != null) {
-                                        Image(
-                                            bitmap = bitmap.asImageBitmap(),
-                                            contentDescription = "Profile Pic",
-                                            modifier = imageModifier,
-                                            contentScale = ContentScale.Crop
-                                        )
+                                        Image(bitmap = bitmap.asImageBitmap(), contentDescription = null, modifier = imageModifier, contentScale = ContentScale.Crop)
                                     } else {
-                                        Image(
-                                            painter = painterResource(R.drawable.logo_kusto_gym),
-                                            contentDescription = "Profile Pic",
-                                            modifier = imageModifier,
-                                            contentScale = ContentScale.Crop
-                                        )
+                                        Image(painter = painterResource(R.drawable.logo_kusto_gym), contentDescription = null, modifier = imageModifier, contentScale = ContentScale.Crop)
                                     }
                                 } else {
                                     AsyncImage(
@@ -191,124 +196,69 @@ fun ProfileScreen(
                                             .data(profile.profilePictureUrl.ifEmpty { R.drawable.logo_kusto_gym })
                                             .crossfade(true)
                                             .build(),
-                                        contentDescription = "Profile Pic",
+                                        contentDescription = null,
                                         modifier = imageModifier,
                                         contentScale = ContentScale.Crop
                                     )
                                 }
-
-                                if (uiState.isLoading) {
-                                    CircularProgressIndicator(modifier = Modifier.size(100.dp), color = Color.White)
+                                Box(modifier = Modifier.align(Alignment.BottomEnd).background(Color.White, CircleShape).padding(4.dp)) {
+                                    Icon(Icons.Default.CameraAlt, null, tint = primaryColor, modifier = Modifier.size(16.dp))
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Nama & Email
-                            Text(
-                                text = profile.name.ifEmpty { "Nama Pengguna" },
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = profile.email,
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
+                            Text(text = profile.name.ifEmpty { "Nama Pengguna" }, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(text = profile.email, fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
 
-                            // Badge Role (Baru)
                             Spacer(Modifier.height(8.dp))
-                            Surface(
-                                color = Color.White.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text(
-                                    text = userRole.uppercase(),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                                Text(text = userRole.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                             }
                         }
                     }
 
-                    // B. Row Kartu Statistik (Warna Ikon mengikuti Role)
                     Row(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .offset(y = (-30).dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp).offset(y = (-30).dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        StatFloatingCard(
-                            icon = Icons.Outlined.Straighten,
-                            value = "${profile.heightCm.toInt()} cm",
-                            label = "Height",
-                            iconTint = primaryColor // Kirim warna dinamis
-                        )
-                        StatFloatingCard(
-                            icon = Icons.Outlined.MonitorWeight,
-                            value = "${profile.weightKg.toInt()} kg",
-                            label = "Weight",
-                            iconTint = primaryColor
-                        )
-                        StatFloatingCard(
-                            icon = Icons.Outlined.Speed,
-                            value = bmiFormatted,
-                            label = "BMI",
-                            iconTint = primaryColor
-                        )
+                        StatFloatingCard(Icons.Outlined.Straighten, "${heightVal.toInt()} cm", "Height", primaryColor)
+                        StatFloatingCard(Icons.Outlined.MonitorWeight, "${weightVal.toInt()} kg", "Weight", primaryColor)
+                        StatFloatingCard(Icons.Outlined.Speed, bmiFormatted, "BMI", primaryColor)
                     }
                 }
             }
 
-            // --- BAGIAN 3: KARTU BMI & FITNESS ---
+            // BMI
             item {
                 Spacer(modifier = Modifier.height(10.dp))
-
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
                             Text("BMI Status", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.height(4.dp))
                             Text(bmiStatus.first, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = bmiStatus.second)
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Fitness Level", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                profile.fitnessLevel.ifEmpty { "-" },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = primaryColor // Gunakan warna role
-                            )
+                            Text(profile.fitnessLevel.ifEmpty { "-" }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = primaryColor)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
-            // --- BAGIAN 4: PERSONAL INFORMATION ---
+            // PERSONAL INFO
             item {
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(2.dp)
@@ -319,38 +269,30 @@ fun ProfileScreen(
 
                         InfoRow(Icons.Outlined.Email, "Email", profile.email)
                         Spacer(Modifier.height(15.dp))
-                        InfoRow(Icons.Outlined.Phone, "Phone", "Belum diatur")
+                        InfoRow(Icons.Outlined.Phone, "Phone", phoneString.ifBlank { "-" })
                         Spacer(Modifier.height(15.dp))
-                        InfoRow(Icons.Outlined.LocationOn, "Address", "Indonesia")
+                        InfoRow(Icons.Outlined.LocationOn, "Address", profile.address.ifBlank { "-" })
                         Spacer(Modifier.height(15.dp))
-                        InfoRow(Icons.Outlined.Cake, "Date of Birth", "-")
+                        InfoRow(Icons.Outlined.Cake, "Date of Birth", dobString.ifBlank { "-" })
                         Spacer(Modifier.height(15.dp))
-                        InfoRow(Icons.Outlined.Person, "Gender", "-")
+                        InfoRow(Icons.Outlined.Person, "Gender", profile.gender.ifBlank { "-" })
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
-            // --- BAGIAN 5: MENU SETTINGS ---
+            // SETTINGS
             item {
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
                     Column {
-                        SettingsItem("Privacy Settings") {}
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-                        SettingsItem("Notifications") {}
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-                        SettingsItem("Help & Support") {}
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-                        SettingsItem("Logout", isDestructive = true) {
-                            showLogoutDialog = true
-                        }
+                        SettingsItem("Edit Profile") { showEditSheet = true }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                        SettingsItem("Logout", isDestructive = true) { showLogoutDialog = true }
                     }
                 }
                 Spacer(modifier = Modifier.height(50.dp))
@@ -358,28 +300,22 @@ fun ProfileScreen(
         }
     }
 
-    // --- DIALOG LOGOUT ---
+    // LOGOUT DIALOG
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             title = { Text("Konfirmasi Logout") },
-            text = { Text("Apakah Anda yakin ingin keluar dari akun ini?") },
+            text = { Text("Apakah Anda yakin ingin keluar?") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLogoutDialog = false
-                        viewModel.logout()
-                        onLogout()
-                    }
-                ) { Text("Keluar", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { showLogoutDialog = false; viewModel.logout(); onLogout() }) {
+                    Text("Keluar", color = MaterialTheme.colorScheme.error)
+                }
             },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("Batal") }
-            }
+            dismissButton = { TextButton(onClick = { showLogoutDialog = false }) { Text("Batal") } }
         )
     }
 
-    // --- BOTTOM SHEET: FORM EDIT PROFIL (Disesuaikan dengan Warna Role) ---
+    // EDIT SHEET
     if (showEditSheet) {
         ModalBottomSheet(
             onDismissRequest = { showEditSheet = false },
@@ -389,109 +325,89 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(bottom = 40.dp)
+                    .padding(bottom = 50.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Text(
-                    "Edit Profil",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.padding(bottom = 16.dp),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Text("Edit Profil", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 20.dp))
 
-                // Input Nama
-                OutlinedTextField(
-                    value = profile.name,
-                    onValueChange = viewModel::onNameChange,
-                    label = { Text("Nama Lengkap") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = primaryColor,
-                        focusedLabelColor = primaryColor,
-                        cursorColor = primaryColor,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                    )
+                EditTextField(label = "Full Name", value = profile.name, onValueChange = viewModel::onNameChange, primaryColor)
+                Spacer(Modifier.height(12.dp))
+
+                EditTextField(label = "Phone Number", value = phoneString, onValueChange = viewModel::onPhoneChange, primaryColor, KeyboardType.Phone)
+                Spacer(Modifier.height(12.dp))
+
+                EditTextField(label = "Address", value = profile.address, onValueChange = viewModel::onAddressChange, primaryColor)
+                Spacer(Modifier.height(12.dp))
+
+                // Menggunakan Local State 'dobInput' agar user bisa mengetik tanggal manual tanpa format reset otomatis
+                EditTextField(
+                    label = "Date of Birth (YYYY-MM-DD)",
+                    value = dobInput,
+                    onValueChange = {
+                        dobInput = it
+                        viewModel.onDobChange(it)
+                    },
+                    primaryColor,
+                    KeyboardType.Number
                 )
                 Spacer(Modifier.height(12.dp))
 
-                // Input Tinggi & Berat
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = if (profile.heightCm > 0) profile.heightCm.toString() else "",
-                        onValueChange = viewModel::onHeightChange,
-                        label = { Text("Tinggi (cm)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            focusedLabelColor = primaryColor,
-                            cursorColor = primaryColor,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                    OutlinedTextField(
-                        value = if (profile.weightKg > 0) profile.weightKg.toString() else "",
-                        onValueChange = viewModel::onWeightChange,
-                        label = { Text("Berat (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            focusedLabelColor = primaryColor,
-                            cursorColor = primaryColor,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
+                OutlinedTextField(
+                    value = profile.gender.ifBlank { "Not Set" },
+                    onValueChange = {},
+                    label = { Text("Gender (Locked)") },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    enabled = false
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    EditTextField(label = "Height (cm)", value = if (profile.heightCm > 0) profile.heightCm.toString() else "", onValueChange = viewModel::onHeightChange, primaryColor, KeyboardType.Number, modifier = Modifier.weight(1f))
+                    EditTextField(label = "Weight (kg)", value = if (profile.weightKg > 0) profile.weightKg.toString() else "", onValueChange = viewModel::onWeightChange, primaryColor, KeyboardType.Decimal, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(12.dp))
 
-                // Dropdown Level
-                LevelFitnessDropdown(
-                    selectedLevel = profile.fitnessLevel,
-                    activeColor = primaryColor, // Kirim warna dinamis
-                    onLevelSelected = viewModel::onFitnessLevelSelected
-                )
+                LevelFitnessDropdown(profile.fitnessLevel, primaryColor, viewModel::onFitnessLevelSelected)
                 Spacer(Modifier.height(24.dp))
 
-                // Tombol Simpan
                 Button(
-                    onClick = {
-                        viewModel.saveProfile()
-                        showEditSheet = false
-                    },
+                    onClick = { viewModel.saveProfile() },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor), // Warna Tombol Dinamis
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !uiState.isSaving,
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
                 ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text("SIMPAN PERUBAHAN", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
+                    if (uiState.isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Text("Simpan Perubahan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
-
-                uiState.error?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
+                Text("Cooldown 1 jam setiap kali menyimpan profil.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
 }
 
-// --- KOMPONEN UI PENDUKUNG ---
+@Composable
+fun EditTextField(label: String, value: String, onValueChange: (String) -> Unit, activeColor: Color, keyboardType: KeyboardType = KeyboardType.Text, modifier: Modifier = Modifier.fillMaxWidth()) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = activeColor, focusedLabelColor = activeColor, cursorColor = activeColor)
+    )
+}
 
 @Composable
-fun StatFloatingCard(icon: ImageVector, value: String, label: String, iconTint: Color) { // Tambah parameter iconTint
+fun StatFloatingCard(icon: ImageVector, value: String, label: String, iconTint: Color) {
     Card(
-        modifier = Modifier
-            .width(100.dp)
-            .height(110.dp),
+        modifier = Modifier.width(100.dp).height(110.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(4.dp)
@@ -501,8 +417,7 @@ fun StatFloatingCard(icon: ImageVector, value: String, label: String, iconTint: 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Gunakan warna dinamis
-            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            Icon(icon, null, tint = iconTint, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -513,8 +428,8 @@ fun StatFloatingCard(icon: ImageVector, value: String, label: String, iconTint: 
 @Composable
 fun InfoRow(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(15.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(16.dp))
         Column {
             Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
@@ -528,22 +443,12 @@ fun SettingsItem(title: String, isDestructive: Boolean = false, onClick: () -> U
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 15.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-        )
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
+        Text(text = title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+        Icon(imageVector = Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -551,41 +456,10 @@ fun SettingsItem(title: String, isDestructive: Boolean = false, onClick: () -> U
 @Composable
 fun LevelFitnessDropdown(selectedLevel: String, activeColor: Color, onLevelSelected: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = selectedLevel,
-            onValueChange = { },
-            readOnly = true,
-            label = { Text("Level Fitness") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = activeColor,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                focusedLabelColor = activeColor,
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-            )
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-        ) {
-            fitnessLevels.forEach { level ->
-                DropdownMenuItem(
-                    text = { Text(level, color = MaterialTheme.colorScheme.onSurface) },
-                    onClick = {
-                        onLevelSelected(level)
-                        expanded = false
-                    }
-                )
-            }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(value = selectedLevel, onValueChange = { }, readOnly = true, label = { Text("Fitness Level") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.menuAnchor().fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = activeColor, focusedLabelColor = activeColor, cursorColor = activeColor))
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+            fitnessLevels.forEach { level -> DropdownMenuItem(text = { Text(level, color = MaterialTheme.colorScheme.onSurface) }, onClick = { onLevelSelected(level); expanded = false }) }
         }
     }
 }
@@ -595,8 +469,5 @@ fun base64ToBitmap(base64String: String): android.graphics.Bitmap? {
         val pureBase64Encoded = base64String.substringAfter(",")
         val decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT)
         BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
-    }
+    } catch (e: Exception) { e.printStackTrace(); null }
 }
