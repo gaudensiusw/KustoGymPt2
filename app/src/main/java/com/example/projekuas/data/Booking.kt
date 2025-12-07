@@ -37,5 +37,6 @@ data class Booking(
 
     val gymClassTitle: String = "", // Judul kelas (opsional)
     val gymClassDescription: String = "", // Deskripsi kelas (opsional
-    val price: Double = 150000.0
+    val price: Double = 150000.0,
+    val ratingTimestamp: Long = 0L // Timestamp when rating was submitted
 )

@@ -12,17 +12,9 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import com.google.firebase.firestore.QuerySnapshot // <-- FIX: Import ini diperlukan untuk type safety
 
-// Data class State UI
-data class ClassBookingState(
-    val classes: List<GymClass> = emptyList(),
-    val myBookings: List<GymClass> = emptyList(),
-    val bookedClassIds: Set<String> = emptySet(),
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val selectedDate: Long = System.currentTimeMillis(),
-    val searchQuery: String = "",
-    val error: String? = null
-)
+import com.example.projekuas.data.ClassBookingState
+
+// Data class State UI moved to com.example.projekuas.data.ClassBookingState
 
 class ClassBookingViewModel(
     private val classRepository: ClassRepository,
@@ -43,11 +35,14 @@ class ClassBookingViewModel(
     // [CORE LOGIC] Menggabungkan semua data secara Realtime
     val state: StateFlow<ClassBookingState> = combine(
         classRepository.getAllClassesStream(),      // 1. Data Kelas (Realtime)
-        classRepository.getUserBookedClassIds(currentUserId), // 2. Data Booking User (Realtime)
+        classRepository.getUserBookingsStream(currentUserId), // 2. Data Booking User (Realtime) - FIX: Get Full Objects
         _selectedDate,                              // 3. Filter Tanggal
         _searchQuery,                               // 4. Filter Search
         _isRefreshing                               // 5. Status Refresh
-    ) { classes, bookedIds, date, query, refreshing ->
+    ) { classes, bookings, date, query, refreshing ->
+
+        val bookingsMap = bookings.associateBy { it.classId }
+        val bookedIds = bookingsMap.keys
 
         val filteredClasses = classes.filter { gymClass ->
             val isDateMatch = isSameDay(gymClass.startTimeMillis, date)
@@ -57,9 +52,25 @@ class ClassBookingViewModel(
             isDateMatch && isSearchMatch
         }.sortedBy { it.startTimeMillis }
 
+        // Inject Booking Data into GymClass for My Bookings
         val myBookedList = classes
             .filter { it.classId in bookedIds }
+            .map { gymClass ->
+                val booking = bookingsMap[gymClass.classId]
+                if (booking != null) {
+                    gymClass.copy(
+                        rating = booking.rating,
+                        ratingTimestamp = booking.ratingTimestamp,
+                        isRated = booking.rating > 0 // Or booking.isRated
+                    )
+                } else {
+                    gymClass
+                }
+            }
             .sortedBy { it.startTimeMillis }
+
+        // Ambil semua tanggal unik dari daftar kelas mentah (sebelum filter tanggal)
+        val allClassDates = classes.map { it.startTimeMillis }.toSet()
 
         ClassBookingState(
             classes = filteredClasses,
@@ -68,7 +79,8 @@ class ClassBookingViewModel(
             isLoading = false,
             isRefreshing = refreshing,
             selectedDate = date,
-            searchQuery = query
+            searchQuery = query,
+            classDates = allClassDates
         )
     }
         .catch { e ->

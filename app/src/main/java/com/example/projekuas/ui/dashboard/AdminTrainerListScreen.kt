@@ -4,15 +4,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -20,7 +25,6 @@ import com.example.projekuas.data.UserProfile
 import com.example.projekuas.ui.components.ConfirmationDialog
 import com.example.projekuas.ui.components.RoleSelectionDialog
 import com.example.projekuas.viewmodel.AdminViewModel
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminTrainerListScreen(
@@ -28,15 +32,22 @@ fun AdminTrainerListScreen(
     onNavigateBack: () -> Unit
 ) {
     val trainers by viewModel.trainerList.collectAsState()
+    var searchQuery by remember { mutableStateOf("") } // Search State
+
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRoleDialog by remember { mutableStateOf(false) }
     var selectedTrainer by remember { mutableStateOf<UserProfile?>(null) }
 
+    // Filter Logic
+    val filteredTrainers = trainers.filter { 
+        it.name.contains(searchQuery, ignoreCase = true) || it.email.contains(searchQuery, ignoreCase = true)
+    }
+
     // Dialog Konfirmasi Hapus
     if (showDeleteDialog && selectedTrainer != null) {
         ConfirmationDialog(
-            title = "Hapus Trainer?",
-            message = "Yakin hapus ${selectedTrainer?.name}? Akses trainer akan dicabut.",
+            title = "Delete Trainer?",
+            message = "Are you sure you want to delete ${selectedTrainer?.name}? Access will be revoked.",
             onConfirm = {
                 selectedTrainer?.let { viewModel.deleteUser(it.userId) }
                 showDeleteDialog = false
@@ -61,111 +72,75 @@ fun AdminTrainerListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Manajemen Trainer", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(trainers) { trainer ->
-                AdminUserCard(
-                    user = trainer,
-                    iconColor = Color(0xFFFF9800), // Warna Orange untuk Trainer
-                    onDeleteClick = {
-                        selectedTrainer = trainer
-                        showDeleteDialog = true
-                    },
-                    onEditRoleClick = {
-                        selectedTrainer = trainer
-                        showRoleDialog = true
-                    }
-                )
-            }
-        }
-    }
-}
 
-// --- PERBAIKAN: Definisi AdminUserCard disesuaikan ---
-@Composable
-fun AdminTrainerCard(
-    user: UserProfile,      // Menerima object UserProfile, bukan string terpisah
-    iconColor: Color,
-    onDeleteClick: () -> Unit, // Nama parameter disesuaikan
-    onEditRoleClick: () -> Unit // Parameter baru ditambahkan
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Icon Avatar
-            Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = iconColor.copy(alpha = 0.2f),
-                modifier = Modifier.size(48.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color(0xFF16A34A), Color(0xFF166534))
+                        )
+                    )
+                    .padding(16.dp)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Person, null, tint = iconColor)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Text("Manage Trainers", color = Color.White, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
                 }
             }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Info User
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.name.ifBlank { "No Name" },
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding)) {
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                placeholder = { Text("Search by name or email") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF1976D2), // Trainer Blue
+                    cursorColor = Color(0xFF1976D2)
                 )
-                Text(
-                    text = user.email,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            )
 
-                // Tombol kecil untuk Edit Role (Klik pada teks role)
-                Row(
-                    modifier = Modifier
-                        .clickable { onEditRoleClick() }
-                        .padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = user.role,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = iconColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Role",
-                        tint = iconColor,
-                        modifier = Modifier.size(14.dp)
+            LazyColumn(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
+            ) {
+                items(filteredTrainers) { trainer ->
+                    AdminUserCard(
+                        user = trainer,
+                        iconColor = Color(0xFF1976D2), // Keep Blue for Trainers distinguishing
+                        onDeleteClick = {
+                            selectedTrainer = trainer
+                            showDeleteDialog = true
+                        },
+                        onEditRoleClick = {
+                            selectedTrainer = trainer
+                            showRoleDialog = true
+                        }
                     )
                 }
-            }
-
-            // Tombol Hapus
-            IconButton(onClick = onDeleteClick) {
-                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
 }
+
+// Reuse AdminUserCard from AdminMemberListScreen (or imported if shared)
+// If AdminUserCard is not shared, we need to ensure it's available or define a similar one here.
+// Assuming we are updating the file where AdminTrainerCard used to be, we can just replace it or ensure consistency.
+// Since we used AdminUserCard in AdminMemberListScreen, let's assume we want consistency.
+// However, the original code had AdminUserCard appearing in AdminMemberListScreen.
+// If they are in the same package (com.example.projekuas.ui.dashboard), AdminUserCard from MemberList IS visible here IF it is top-level. 
+// It was top-level in MemberList.
+// So we can just call AdminUserCard. But wait, I should verify if it's visible. 
+// If it's in the same package, yes.

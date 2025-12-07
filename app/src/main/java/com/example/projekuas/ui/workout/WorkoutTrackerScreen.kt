@@ -172,7 +172,7 @@ fun StartWorkoutContent(
     onNavigateToSelection: (String) -> Unit,
     onNavigateToActiveWorkout: () -> Unit
 ) {
-    LazyColumn(contentPadding = PaddingValues(20.dp)) {
+    LazyColumn(contentPadding = PaddingValues(bottom = 100.dp, top = 20.dp, start = 20.dp, end = 20.dp)) {
         item {
             Text("Choose Muscle Group", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 12.dp), color = MaterialTheme.colorScheme.onBackground)
         }
@@ -230,7 +230,7 @@ fun HistoryContent(
     onToggleSelection: (String) -> Unit,
     onLongPress: (String) -> Unit
 ) {
-    LazyColumn(contentPadding = PaddingValues(20.dp)) {
+    LazyColumn(contentPadding = PaddingValues(bottom = 100.dp, top = 20.dp, start = 20.dp, end = 20.dp)) {
         item {
             // Header Card dihapus jika dalam mode seleksi agar bersih
             if (!selectionState.isSelectionMode) {

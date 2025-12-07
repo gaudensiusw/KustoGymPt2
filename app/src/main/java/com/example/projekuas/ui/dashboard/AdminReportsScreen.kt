@@ -1,10 +1,12 @@
 package com.example.projekuas.ui.dashboard
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,32 +19,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.projekuas.data.Booking
 import com.example.projekuas.viewmodel.AdminViewModel
-// Ganti baris di bawah ini dengan ViewModel yang benar di proyek Anda (misalnya AdminViewModel)
-import com.example.projekuas.viewmodel.HomeViewModelFactory
-import com.example.projekuas.viewmodel.ReportViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-// JANGAN LUPA: Anda harus membuat file ReportViewModel.kt atau mengubah baris di atas
-// dan juga baris val viewModel: ReportViewModel = ...
-// menjadi ViewModel yang benar.
-
-// --- DATA CLASSES (Diambil dari ReportViewModel) ---
-data class MonthlyData(val month: String, val revenue: Int)
-data class TopClassData(val name: String, val bookings: Int, val revenue: String)
-data class MembershipData(val type: String, val count: Int, val percentage: Float, val color: Color)
 
 // --- WARNA TEMA REPORT ---
 val ReportGreenDark = Color(0xFF166534)
@@ -50,118 +39,140 @@ val ReportGreenPrimary = Color(0xFF16A34A)
 val ReportGreenLight = Color(0xFFDCFCE7)
 val ReportBg = Color(0xFFF9FAFB)
 
+// --- DATA CLASSES (Shared with ViewModel) ---
+data class MonthlyData(val month: String, val revenue: Double)
+data class TopClassData(val name: String, val bookings: Int, val revenue: String)
+data class MembershipData(val type: String, val count: Int, val percentage: Float, val color: Color)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminReportsScreen(
     viewModel: AdminViewModel,
     onNavigateBack: () -> Unit
 ) {
-    // Ambil reportList yang sudah diproses
-    val transactions by viewModel.transactionList.collectAsState()
+    // Ambil Data State
     val state by viewModel.dashboardState.collectAsState()
+    val reportState by viewModel.reportState.collectAsState()
+    val selectedPeriod by viewModel.selectedPeriod.collectAsState()
+    val displayedRevenue = viewModel.formatCurrency(state.totalRevenue)
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Laporan Keuangan", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Back") } }
-            )
-        }
+        containerColor = MaterialTheme.colorScheme.background // Adapt to Dark Mode
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // Card Summary
+            // 1. Header with Filters
+            item {
+                ReportHeader(
+                    onBack = onNavigateBack,
+                    selectedPeriod = selectedPeriod,
+                    onPeriodSelect = { viewModel.setReportPeriod(it) }
+                )
+            }
+
+            // 2. Summary Metrics Grid
+            item {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Overview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max) // Force Equal Height
+                    ) {
+                        MetricCard(
+                            title = "Total Revenue",
+                            value = displayedRevenue,
+                            icon = Icons.Default.MonetizationOn,
+                            iconColor = ReportGreenPrimary,
+                            iconBg = ReportGreenLight.copy(alpha = 0.2f),
+                            trend = "+12%",
+                            isTrendUp = true,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                        MetricCard(
+                            title = "Active Sessions",
+                            value = state.activeSessions.toString(),
+                            icon = Icons.Default.EventAvailable,
+                            iconColor = Color(0xFFF59E0B),
+                            iconBg = Color(0xFFFEF3C7).copy(alpha = 0.2f),
+                            trend = "+5%",
+                            isTrendUp = true,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+
+            // 3. Monthly Membership Revenue
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), // Adapt
+                    elevation = CardDefaults.cardElevation(2.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text("Total Pendapatan", color = Color.White.copy(0.8f))
-                        Text(
-                            text = viewModel.formatCurrency(state.totalRevenue),
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("${state.activeSessions} Transaksi Berhasil", color = Color.White.copy(0.8f), fontSize = 12.sp)
+                    Column(Modifier.padding(20.dp)) {
+                        Text("Membership Revenue", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("(in Millions IDR)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(20.dp))
+                        
+                        val maxRevenue = reportState.monthlyRevenue.maxOfOrNull { it.revenue } ?: 1.0
+                        
+                        if (reportState.monthlyRevenue.isEmpty()) {
+                             Text("No revenue data for this period.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            reportState.monthlyRevenue.forEach { data ->
+                                RevenueBarItem(data, maxRevenue)
+                                Spacer(Modifier.height(16.dp))
+                            }
+                        }
                     }
                 }
             }
 
+            // 4. Membership Distribution
             item {
-                Text("Riwayat Transaksi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-
-            if (transactions.isEmpty()) {
-                item { Text("Belum ada data transaksi.", color = Color.Gray) }
-            } else {
-                items(transactions) { booking ->
-                    TransactionItem(booking, viewModel)
+                Column(Modifier.padding(16.dp)) {
+                    Text("Membership Distribution", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(2.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(Modifier.padding(20.dp)) {
+                            // Always show list if categories are present (ViewModel ensures this)
+                            reportState.membershipStats.forEach { stat ->
+                                MembershipBarItem(stat)
+                                Spacer(Modifier.height(16.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-// --- SUB-COMPONENTS (IMPLEMENTASI LENGKAP) ---
+// --- SUB-COMPONENTS ---
 
 @Composable
-fun TransactionItem(booking: Booking, viewModel: AdminViewModel) { // Terima Booking
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Receipt, null, tint = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                // [FIX] Gunakan field gymClassTitle langsung dari Booking
-                Text(text = booking.gymClassTitle, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text(text = booking.userName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                Text(
-                    text = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID")).format(Date(booking.bookingTimeMillis)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.LightGray
-                )
-            }
-            Text(
-                text = "+ ${viewModel.formatCurrency(booking.price)}",
-                color = Color(0xFF4CAF50),
-                fontWeight = FontWeight.Bold
-            )
-            }
-            Text(
-                    text = "+ ${viewModel.formatCurrency(booking.price)}",
-        color = Color(0xFF4CAF50),
-        fontWeight = FontWeight.Bold
-        )
-        }
-    }
-
-
-@Composable
-fun ReportHeader(onBack: () -> Unit) {
-    var selectedPeriod by remember { mutableStateOf("Month") }
+fun ReportHeader(
+    onBack: () -> Unit,
+    selectedPeriod: String,
+    onPeriodSelect: (String) -> Unit
+) {
     val periods = listOf("Week", "Month", "Quarter", "Year")
 
+    // Header Background: Gradient Green
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -183,15 +194,6 @@ fun ReportHeader(onBack: () -> Unit) {
                 }
                 Text("Reports & Analytics", color = Color.White, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
             }
-            Row {
-                IconButton(onClick = {}, modifier = Modifier.background(Color.White.copy(0.2f), CircleShape)) {
-                    Icon(Icons.Default.FilterList, contentDescription = null, tint = Color.White)
-                }
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = {}, modifier = Modifier.background(Color.White.copy(0.2f), CircleShape)) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = Color.White)
-                }
-            }
         }
 
         Spacer(Modifier.height(20.dp))
@@ -203,7 +205,7 @@ fun ReportHeader(onBack: () -> Unit) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .background(if (isSelected) Color.White else Color.White.copy(0.2f))
-                        .clickable { selectedPeriod = period }
+                        .clickable { onPeriodSelect(period) }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -231,11 +233,14 @@ fun MetricCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), // Adapt
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween // Distribute vertical space
+        ) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -265,20 +270,20 @@ fun MetricCard(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-            Text(title, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Text(value, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
+            Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-fun RevenueBarItem(data: MonthlyData, maxRevenue: Int) {
-    val percentage = if (maxRevenue > 0) data.revenue.toFloat() / maxRevenue.toFloat() else 0f
+fun RevenueBarItem(data: MonthlyData, maxRevenue: Double) {
+    val percentage = if (maxRevenue > 0) (data.revenue / maxRevenue).toFloat() else 0f
 
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(data.month, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            Text("Rp ${data.revenue}M", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            Text(data.month, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Rp ${String.format("%.1f", data.revenue)}M", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.height(6.dp))
         LinearProgressIndicator(
@@ -288,49 +293,50 @@ fun RevenueBarItem(data: MonthlyData, maxRevenue: Int) {
                 .height(10.dp)
                 .clip(RoundedCornerShape(50)),
             color = ReportGreenPrimary,
-            trackColor = Color(0xFFF3F4F6),
+            trackColor = MaterialTheme.colorScheme.surfaceVariant, // Adapt
         )
     }
 }
 
 @Composable
-fun TopClassItem(rank: Int, data: TopClassData) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(ReportGreenLight, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(rank.toString(), color = ReportGreenPrimary, fontWeight = FontWeight.Bold)
+fun MembershipBarItem(data: MembershipData) {
+    Column {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(data.color)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = data.type,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface // Adapt
+                )
             }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(data.name, fontWeight = FontWeight.Medium)
-                Text("${data.bookings} bookings", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            }
+            Text(
+                text = "${data.count} members",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, // Adapt
+                fontWeight = FontWeight.Medium
+            )
         }
-        Text(data.revenue, fontWeight = FontWeight.Bold, color = Color.Black)
-    }
-}
-
-@Composable
-fun ExportButton(label: String) {
-    Button(
-        onClick = {},
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = PaddingValues(vertical = 12.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
-    ) {
-        Icon(Icons.Default.Download, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = Color(0xFF374151))
+        Spacer(Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { data.percentage },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(50)),
+            color = data.color,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant // Adapt
+        )
     }
 }

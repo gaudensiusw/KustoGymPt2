@@ -28,7 +28,10 @@ import com.example.projekuas.data.GymClass
 import com.example.projekuas.ui.theme.GymOrange
 import com.example.projekuas.ui.theme.GymPurple
 import com.example.projekuas.ui.theme.GymPurpleDark
+import com.example.projekuas.ui.theme.GymPurpleDark
 import com.example.projekuas.viewmodel.ClassBookingViewModel
+import com.example.projekuas.ui.components.CalendarView // Import CalendarView
+import com.example.projekuas.ui.components.RatingDialog
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.absoluteValue
@@ -141,6 +144,8 @@ fun ClassBookingScreen(
             if (showRatingDialog && classToRate != null) {
                 RatingDialog(
                     trainerName = classToRate!!.trainerName,
+                    initialRating = classToRate!!.rating,
+                    initialReview = classToRate!!.review,
                     onDismiss = { classToRate = null }, // Tutup dialog dengan reset state
                     onSubmit = { rating, review ->
                         // Kirim rating menggunakan objek GymClass lengkap
@@ -160,7 +165,7 @@ fun ClassBookingScreen(
 // --- TAB CONTENT: AVAILABLE CLASSES ---
 @Composable
 fun AvailableClassesContent(
-    uiState: com.example.projekuas.viewmodel.ClassBookingState,
+    uiState: com.example.projekuas.data.ClassBookingState,
     viewModel: ClassBookingViewModel
 ) {
     LazyColumn(
@@ -169,9 +174,10 @@ fun AvailableClassesContent(
     ) {
         // Date Strip
         item {
-            DateStripSection(
-                selectedDate = Date(uiState.selectedDate),
-                onDateSelected = { date -> viewModel.onDateSelected(date.time) }
+            CalendarView(
+                selectedDate = uiState.selectedDate,
+                onDateSelected = { date -> viewModel.onDateSelected(date) },
+                markedDates = uiState.classDates
             )
         }
 
@@ -344,6 +350,8 @@ fun ClassItemCard(
 
     val isPastClass = gymClass.startTimeMillis < System.currentTimeMillis()
     val hasBeenRated = gymClass.rating > 0
+    // [NEW] Logic 12 Jam Edit
+    val canEdit = if (hasBeenRated) (System.currentTimeMillis() - gymClass.ratingTimestamp) < (43200000L) else true // 12 jam
 
     val imageIndex = gymClass.classId.hashCode().absoluteValue % ClassImages.size
     val selectedImageRes = ClassImages[imageIndex]
@@ -388,46 +396,38 @@ fun ClassItemCard(
                         // FIX: Logic ini harus memanggil onRateClick() agar dialog muncul
                         isPastClass && isBooked && !hasBeenRated -> onRateClick()
                         isBooked -> onCancelClick()
-                        !isBooked && !isFull -> onBookClick()
+                        !isBooked && !isFull && !isPastClass -> onBookClick() // Prevents booking past classes
                         else -> {}
                     }
                 },
-                enabled = isBooked || (!isBooked && !isFull),
+                enabled = (isBooked && isPastClass && (!hasBeenRated || canEdit)) || (isBooked && !isPastClass) || (!isBooked && !isFull && !isPastClass),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = 12.dp)
-                    .height(40.dp),
+                    .padding(horizontal = 12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = when {
-                        isBooked && isPastClass && !hasBeenRated -> Color(0xFFFF9800) // Orange
-                        isBooked && isPastClass && hasBeenRated -> Color.Gray // Sudah dirating
-                        isBooked -> MaterialTheme.colorScheme.surfaceVariant // Abu (Cancel)
-                        else -> MaterialTheme.colorScheme.primary // Ungu (Book)
-                    },
-                    contentColor = when {
-                        isBooked && isPastClass && !hasBeenRated -> Color.White
-                        isBooked -> MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> MaterialTheme.colorScheme.onPrimary
-                    }
-                ),
-                shape = RoundedCornerShape(20.dp)
+                    containerColor = if (isPastClass && !isBooked) Color.Gray else MaterialTheme.colorScheme.primary, // Gray for finished classes
+                    disabledContainerColor = if (isPastClass && !isBooked) Color.Gray else MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
                 Text(
                     text = when {
                         isBooked && isPastClass && !hasBeenRated -> "Rate Trainer"
-                        isBooked && isPastClass && hasBeenRated -> "Completed"
+                        isBooked && isPastClass && hasBeenRated && canEdit -> "Edit Rating"
+                        isBooked && isPastClass && hasBeenRated -> "Rated"
+                        isPastClass && !isBooked -> "Finished" // New State
                         isBooked -> "Cancel Booking"
                         isFull -> "Full"
                         else -> "Book Now"
                     },
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = if (isPastClass && !isBooked) Color.White else MaterialTheme.colorScheme.onPrimary // Ensure text is visible
                 )
+            }
             }
         }
     }
-}
+
 
 // --- HELPER FUNCTIONS ---
 fun isSameDay(date1: Date, date2: Date): Boolean {
@@ -453,17 +453,4 @@ fun TabButton(text: String, isSelected: Boolean, modifier: Modifier, onClick: ()
     }
 }
 
-@Composable
-fun DateStripSection(selectedDate: Date, onDateSelected: (Date) -> Unit) {
-    val dates = remember { val c = Calendar.getInstance(); val l = mutableListOf<Date>(); repeat(14) { l.add(c.time); c.add(Calendar.DAY_OF_YEAR, 1) }; l }
-    val df = SimpleDateFormat("EEE", Locale("id", "ID")); val dF = SimpleDateFormat("dd", Locale.getDefault())
-    LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-        items(dates) { date ->
-            val isSelected = isSameDay(date, selectedDate)
-            Column(modifier = Modifier.width(60.dp).height(80.dp).clip(RoundedCornerShape(16.dp)).background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface).clickable { onDateSelected(date) }.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text(df.format(date), color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(0.8f) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                Text(dF.format(date), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
+// DateStripSection Removed (replaced by CalendarView)

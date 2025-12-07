@@ -53,7 +53,9 @@ fun TrainerDashboardScreen(
     themeViewModel: ThemeViewModel, // <--- 1. Parameter Baru
     onNavigateToClassForm: (String?) -> Unit,
     onNavigateToSchedule: () -> Unit,
-    onNavigateToMembers: () -> Unit
+    onNavigateToMembers: () -> Unit,
+    onNavigateToReviews: () -> Unit, // Parameter Baru
+    onNavigateToNotifications: () -> Unit // NEW: Notifications
 ) {
     val viewModel: TrainerViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsState()
@@ -70,7 +72,7 @@ fun TrainerDashboardScreen(
             onDismissRequest = { showEarningsDialog = false },
             icon = { Icon(Icons.Default.AttachMoney, null) },
             title = { Text("Earnings") },
-            text = { Text("Fitur Earnings belum tersedia. Total pendapatan bulan ini diperkirakan: Rp 12.500.000") },
+            text = { Text("Earnings feature is not yet available. Estimated revenue for this month: Rp 12,500,000") },
             confirmButton = { TextButton(onClick = { showEarningsDialog = false }) { Text("OK") } }
         )
     }
@@ -95,9 +97,11 @@ fun TrainerDashboardScreen(
                     classesCount = state.classesTodayCount,
                     activeMembers = state.activeMembersCount,
                     performanceRate = state.performanceRate,
+                    rating = state.rating, // Pass Rating
                     // 2. Kirim Data Tema ke Header
                     isDarkMode = themeViewModel.isDarkMode,
-                    onToggleTheme = { themeViewModel.toggleTheme() }
+                    onToggleTheme = { themeViewModel.toggleTheme() },
+                    onNavigateToNotifications = onNavigateToNotifications // NEW
                 )
             }
 
@@ -106,7 +110,7 @@ fun TrainerDashboardScreen(
                 QuickActionsSection(
                     onScheduleClick = onNavigateToSchedule,
                     onMembersClick = onNavigateToMembers,
-                    onEarningsClick = { showEarningsDialog = true }
+                    onReviewsClick = onNavigateToReviews
                 )
             }
 
@@ -158,18 +162,20 @@ fun TrainerHeaderSection(
     classesCount: Int,
     activeMembers: Int,
     performanceRate: Double,
+    rating: Double, // Parameter Baru
     isDarkMode: Boolean,      // <--- Parameter Baru
-    onToggleTheme: () -> Unit // <--- Parameter Baru
+    onToggleTheme: () -> Unit, // <--- Parameter Baru
+    onNavigateToNotifications: () -> Unit // NEW
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
             .background(Brush.verticalGradient(listOf(TrainerBluePrimary, TrainerBlueDark)))
-            .padding(24.dp)
+            .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 24.dp)
     ) {
         Column {
-            // Row Header Atas (Welcome + Theme Toggle)
+            // Row Header Atas (Welcome + Theme Toggle + Notif)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -180,13 +186,18 @@ fun TrainerHeaderSection(
                     Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
                 }
 
-                // Tombol Tema
-                IconButton(onClick = onToggleTheme) {
-                    Icon(
-                        imageVector = if (isDarkMode) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
-                        contentDescription = "Toggle Theme",
-                        tint = Color.White
-                    )
+                // Tombol Kanan (Tema & Notif)
+                Row {
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                            contentDescription = "Toggle Theme",
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(onClick = onNavigateToNotifications) {
+                        Icon(Icons.Default.Notifications, "Notifications", tint = Color.White)
+                    }
                 }
             }
 
@@ -198,7 +209,6 @@ fun TrainerHeaderSection(
                     TrainerStatCard(Icons.Default.Group, "$activeMembers", "Active Members", Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val rating = (performanceRate / 100) * 5
                     val formattedRating = String.format("%.1f", rating)
                     TrainerStatCard(Icons.Default.TrendingUp, "Top 10%", "Ranking", Modifier.weight(1f))
                     TrainerStatCard(Icons.Default.Star, formattedRating, "Avg Rating", Modifier.weight(1f), isOrange = true)
@@ -233,7 +243,7 @@ fun TrainerStatCard(icon: ImageVector, value: String, label: String, modifier: M
 }
 
 @Composable
-fun QuickActionsSection(onScheduleClick: () -> Unit, onMembersClick: () -> Unit, onEarningsClick: () -> Unit) {
+fun QuickActionsSection(onScheduleClick: () -> Unit, onMembersClick: () -> Unit, onReviewsClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-10).dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), // Gunakan surface color agar adaptif tema
@@ -246,7 +256,8 @@ fun QuickActionsSection(onScheduleClick: () -> Unit, onMembersClick: () -> Unit,
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 QuickActionItem(Icons.Default.CalendarMonth, "Schedule", Color(0xFFE3F2FD), TrainerBluePrimary, onScheduleClick)
                 QuickActionItem(Icons.Default.Group, "Members", Color(0xFFF3E5F5), Color(0xFF9C27B0), onMembersClick)
-                QuickActionItem(Icons.Default.AttachMoney, "Earnings", Color(0xFFE8F5E9), Color(0xFF4CAF50), onEarningsClick)
+                // Ganti Earnings -> Reviews
+                QuickActionItem(Icons.Default.Reviews, "Reviews", Color(0xFFFFF3E0), Color(0xFFFF9800), onReviewsClick)
             }
         }
     }

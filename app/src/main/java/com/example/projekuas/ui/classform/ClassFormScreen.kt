@@ -95,11 +95,11 @@ fun ClassFormScreen(
                     .height(120.dp)
                     .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
                     .background(
-                        // FIX: Gradasi menggunakan warna Primary tema
+                // FIX: Warna Gradasi menggunakan warna Primary tema
                         Brush.verticalGradient(
                             listOf(
                                 MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.secondary // atau primaryContainer
+                                MaterialTheme.colorScheme.secondary
                             )
                         )
                     )
@@ -119,13 +119,13 @@ fun ClassFormScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
-                            text = if (state.classIdToEdit == null) "Tambah Kelas Baru" else "Edit Kelas",
+                            text = if (state.classIdToEdit == null) "Add New Class" else if (state.isReadOnly) "Class Details (Ended)" else "Edit Class",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Text(
-                            text = "Isi detail kelas di bawah ini",
+                            text = if (state.isReadOnly) "Class is ongoing/ended, cannot edit" else "Fill in the class details below",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onPrimary.copy(0.8f)
                         )
@@ -134,16 +134,16 @@ fun ClassFormScreen(
             }
         },
         bottomBar = {
-            // Tombol Simpan Melayang di Bawah
-            Surface(
-                // FIX: Gunakan Surface color tema
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shadowElevation = 8.dp,
-                modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            ) {
-                Button(
-                    onClick = { viewModel.saveOrUpdateClass {} },
+            if (!state.isReadOnly) {
+                // Tombol Simpan Melayang di Bawah
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                ) {
+                    Button(
+                        onClick = { viewModel.saveOrUpdateClass {} },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(20.dp)
@@ -159,13 +159,14 @@ fun ClassFormScreen(
                     if (state.isSaving) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Menyimpan...")
+                        Text("Saving...")
                     } else {
-                        Text("Simpan Kelas", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Save Class", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
+    }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -175,6 +176,24 @@ fun ClassFormScreen(
                 .padding(20.dp), // Menambahkan padding agar konten tidak terlalu mepet
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Warning Box
+            if (state.isReadOnly) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "This class is ongoing or has ended. You cannot modify it.",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
             // 0. AREA UPLOAD GAMBAR COVER
             Box(
                 modifier = Modifier
@@ -183,7 +202,7 @@ fun ClassFormScreen(
                     // FIX: Background placeholder mengikuti tema (Surface Variant)
                     .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
                     .clip(RoundedCornerShape(16.dp))
-                    .clickable { imagePickerLauncher.launch("image/*") },
+                    .clickable(enabled = !state.isReadOnly) { imagePickerLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
                 if (state.currentImageUrl.isNotBlank()) {
@@ -218,7 +237,7 @@ fun ClassFormScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = if (state.currentImageUrl.isNotBlank()) "Ganti Sampul" else "Upload Foto Sampul",
+                        text = if (state.currentImageUrl.isNotBlank()) "Change Cover" else "Upload Cover Photo",
                         // FIX: Warna teks menyesuaikan kondisi gambar
                         color = if (state.currentImageUrl.isNotBlank()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold
@@ -230,20 +249,22 @@ fun ClassFormScreen(
             FancyTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
-                label = "Nama Kelas",
-                placeholder = "Contoh: Yoga Morning Flow",
-                icon = Icons.Default.FitnessCenter
+                label = "Class Name",
+                placeholder = "Ex: Yoga Morning Flow",
+                icon = Icons.Default.FitnessCenter,
+                enabled = !state.isReadOnly
             )
 
             // 2. Input Deskripsi
             FancyTextField(
                 value = state.description,
                 onValueChange = viewModel::onDescriptionChange,
-                label = "Deskripsi",
-                placeholder = "Jelaskan detail latihan...",
+                label = "Description",
+                placeholder = "Describe the workout details...",
                 icon = Icons.Outlined.Description,
                 singleLine = false,
-                minLines = 3
+                minLines = 3,
+                enabled = !state.isReadOnly
             )
 
             // 3. Row Durasi & Kapasitas
@@ -255,20 +276,22 @@ fun ClassFormScreen(
                     FancyTextField(
                         value = state.durationMinutes,
                         onValueChange = viewModel::onDurationChange,
-                        label = "Durasi (Menit)",
+                        label = "Duration (Minutes)",
                         placeholder = "60",
                         icon = Icons.Outlined.Timer,
-                        keyboardType = KeyboardType.Number
+                        keyboardType = KeyboardType.Number,
+                        enabled = !state.isReadOnly
                     )
                 }
                 Box(modifier = Modifier.weight(1f)) {
                     FancyTextField(
                         value = state.capacity,
                         onValueChange = viewModel::onCapacityChange,
-                        label = "Kapasitas",
+                        label = "Capacity",
                         placeholder = "20",
                         icon = Icons.Outlined.Groups,
-                        keyboardType = KeyboardType.Number
+                        keyboardType = KeyboardType.Number,
+                        enabled = !state.isReadOnly
                     )
                 }
             }
@@ -279,18 +302,19 @@ fun ClassFormScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // FIX: Text color
-            Text("Jadwal Pelaksanaan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+            Text("Schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 
             // 4. Date Picker
             ClickableInputCard(
-                label = "Tanggal Mulai",
-                value = state.dateDisplay.ifEmpty { "Pilih Tanggal" },
+                label = "Start Date",
+                value = state.dateDisplay.ifEmpty { "Select Date" },
                 icon = Icons.Default.DateRange,
                 onClick = {
                     showDatePicker(context, state.selectedDateMillis) { millis, str ->
                         viewModel.onDateSelected(millis, str)
                     }
-                }
+                },
+                enabled = !state.isReadOnly
             )
 
             // 5. Time Picker
@@ -302,14 +326,15 @@ fun ClassFormScreen(
             }
 
             ClickableInputCard(
-                label = "Jam Mulai",
+                label = "Start Time",
                 value = timeDisplay,
                 icon = Icons.Default.Schedule,
                 onClick = {
                     showTimePicker(context, state.selectedTimeMillis) { h, m ->
                         viewModel.onTimeSelected(h, m)
                     }
-                }
+                },
+                enabled = !state.isReadOnly
             )
 
             // Info Trainer
@@ -323,7 +348,7 @@ fun ClassFormScreen(
                     Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "Trainer akan otomatis diisi dengan akun Anda saat ini.",
+                        text = "Trainer will be automatically set to your account.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -340,7 +365,7 @@ fun ClassFormScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }
@@ -356,7 +381,8 @@ fun FancyTextField(
     icon: ImageVector,
     singleLine: Boolean = true,
     minLines: Int = 1,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    enabled: Boolean = true
 ) {
     Column {
         // FIX: Label color
@@ -366,12 +392,13 @@ fun FancyTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-            leadingIcon = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            leadingIcon = { Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.primary else Color.Gray) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             singleLine = singleLine,
             minLines = minLines,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            enabled = enabled,
             // FIX: Colors mengikuti tema
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -379,7 +406,10 @@ fun FancyTextField(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
     }
@@ -390,7 +420,8 @@ fun ClickableInputCard(
     label: String,
     value: String,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Column {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp, start = 4.dp))
@@ -399,10 +430,10 @@ fun ClickableInputCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .clickable { onClick() },
+                .then(if (enabled) Modifier.clickable { onClick() } else Modifier),
             shape = RoundedCornerShape(16.dp),
             // FIX: Colors mengikuti tema
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = if (enabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Row(
@@ -411,15 +442,17 @@ fun ClickableInputCard(
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.primary else Color.Gray)
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (enabled) {
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -437,7 +470,7 @@ fun showDatePicker(context: Context, initialMillis: Long, onDateSelected: (Long,
             val selectedCalendar = Calendar.getInstance()
             selectedCalendar.set(year, month, dayOfMonth, 0, 0, 0)
             selectedCalendar.set(Calendar.MILLISECOND, 0)
-            val format = java.text.SimpleDateFormat("EEEE, dd MMM yyyy", Locale("id", "ID"))
+            val format = java.text.SimpleDateFormat("EEEE, dd MMM yyyy", Locale.US)
             val dateString = format.format(selectedCalendar.time)
             onDateSelected(selectedCalendar.timeInMillis, dateString)
         },

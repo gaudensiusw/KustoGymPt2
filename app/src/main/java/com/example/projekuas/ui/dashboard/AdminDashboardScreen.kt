@@ -38,6 +38,7 @@ val AdminGreenDark = Color(0xFF2E7D32)
 fun AdminDashboardScreen(
     viewModel: AdminViewModel,
     themeViewModel: ThemeViewModel,
+    name: String,
     onNavigateToReports: () -> Unit,
     onNavigateToTrainers: () -> Unit,
     onNavigateToChat: () -> Unit,
@@ -78,7 +79,7 @@ fun AdminDashboardScreen(
                                 fontSize = 16.sp
                             )
                             Text(
-                                "Admin",
+                                name.ifBlank { "Admin" },
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 24.sp
@@ -162,13 +163,22 @@ fun AdminDashboardScreen(
         // --- BAGIAN 3: RECENT ACTIVITY ---
         item {
             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                Text(
-                    text = "Recent Activity",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground, // FIX: Warna teks adaptif
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recent Transactions",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    TextButton(onClick = onNavigateToReports) {
+                        Text("View All", color = AdminGreenPrimary)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
 
                 if (recentActivities.isEmpty()) {
                     Text(
@@ -317,36 +327,40 @@ fun AdminQuickActionItem(
 fun AdminActivityItem(activity: com.example.projekuas.data.RecentActivity) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        // FIX: Warna Card
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(AdminGreenPrimary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(activity.userInitial, fontWeight = FontWeight.Bold, color = AdminGreenPrimary)
+                Text(
+                    activity.userInitial,
+                    fontWeight = FontWeight.Bold,
+                    color = AdminGreenPrimary,
+                    fontSize = 18.sp
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     activity.action,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface // FIX: Warna Teks
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     "${activity.user} • ${activity.time}",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant // FIX: Warna Teks Sekunder
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(

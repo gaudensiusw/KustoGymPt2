@@ -104,7 +104,7 @@ fun ProfileScreen(
     val bmiFormatted = String.format("%.1f", bmiValue)
 
     val bmiStatus = when {
-        bmiValue == 0.0 -> "Belum ada data" to MaterialTheme.colorScheme.onSurfaceVariant
+        bmiValue == 0.0 -> "No Data" to MaterialTheme.colorScheme.onSurfaceVariant
         bmiValue < 18.5 -> "Underweight" to GymBlue
         bmiValue < 25.0 -> "Normal" to GymGreen
         bmiValue < 30.0 -> "Overweight" to GymOrange
@@ -142,9 +142,22 @@ fun ProfileScreen(
         uri?.let { viewModel.updateProfilePicture(it) }
     }
 
+    // [NEW] Achievement Dialog State (Managed locally or via ViewModel)
+    var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
+    // IMPORTANT: Assuming ViewModel has no selectAchievement yet, I'll manage it locally for UI demo
+    // Or I'll add a helper in ProfileScreen to handle the click.
+    // The onClick above calls viewModel.selectAchievement which doesn't exist.
+    // I will change the logic above to use `selectedAchievement = achievement`.
+    
+    if (selectedAchievement != null) {
+        AchievementDetailDialog(achievement = selectedAchievement!!) {
+            selectedAchievement = null
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState, modifier = Modifier.padding(bottom = 100.dp)) }
     ) { paddingValues ->
 
         LazyColumn(
@@ -219,7 +232,7 @@ fun ProfileScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            Text(text = profile.name.ifEmpty { "Nama Pengguna" }, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(text = profile.name.ifEmpty { "User Name" }, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Text(text = profile.email, fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
 
                             Spacer(Modifier.height(8.dp))
@@ -308,18 +321,8 @@ fun ProfileScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 20.dp)
                 )
+                AchievementsSection(achievements = mockAchievements, onAchievementClick = { selectedAchievement = it })
                 Spacer(modifier = Modifier.height(12.dp))
-
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // FIX: Using mockAchievements to ensure visuals appear
-                    items(mockAchievements) { achievement ->
-                        AchievementBadge(achievement = achievement)
-                    }
-                }
-                Spacer(modifier = Modifier.height(20.dp))
             }
 
             // SETTINGS
@@ -345,14 +348,14 @@ fun ProfileScreen(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Konfirmasi Logout") },
-            text = { Text("Apakah Anda yakin ingin keluar?") },
+            title = { Text("Logout Confirmation") },
+            text = { Text("Are you sure you want to logout?") },
             confirmButton = {
                 TextButton(onClick = { showLogoutDialog = false; viewModel.logout(); onLogout() }) {
-                    Text("Keluar", color = MaterialTheme.colorScheme.error)
+                    Text("Logout", color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { showLogoutDialog = false }) { Text("Batal") } }
+            dismissButton = { TextButton(onClick = { showLogoutDialog = false }) { Text("Cancel") } }
         )
     }
 
@@ -369,7 +372,7 @@ fun ProfileScreen(
                     .padding(bottom = 50.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text("Edit Profil", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 20.dp))
+                Text("Edit Profile", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 20.dp))
 
                 EditTextField(label = "Full Name", value = profile.name, onValueChange = viewModel::onNameChange, activeColor = primaryColor)
                 Spacer(Modifier.height(12.dp))
@@ -423,13 +426,14 @@ fun ProfileScreen(
                     enabled = !uiState.isSaving,
                     colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
                 ) {
-                    if (uiState.isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Text("Simpan Perubahan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    if (uiState.isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Text("Save Changes", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
-                Text("Cooldown 1 jam setiap kali menyimpan profil.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("1 hour cooldown between profile updates.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
 }
+
 
 // ... Sisa fungsi helper (EditTextField, StatFloatingCard, dll) sama seperti sebelumnya ...
 @Composable
@@ -551,7 +555,7 @@ fun AchievementBadge(achievement: Achievement) {
     }
 }
 @Composable
-fun AchievementsSection(achievements: List<Achievement>) {
+fun AchievementsSection(achievements: List<Achievement>, onAchievementClick: (Achievement) -> Unit) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -560,19 +564,21 @@ fun AchievementsSection(achievements: List<Achievement>) {
             .padding(top = 8.dp)
     ) {
         items(achievements) { item ->
-            AchievementItem(achievement = item)
+            AchievementItem(achievement = item, onClick = { onAchievementClick(item) })
         }
     }
 }
 
 @Composable
-fun AchievementItem(achievement: Achievement) {
+fun AchievementItem(achievement: Achievement, onClick: () -> Unit) {
     val backgroundColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.primaryContainer else Color.LightGray.copy(alpha = 0.3f)
     val iconColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.primary else Color.Gray
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(70.dp) // Fixed width keeps them uniform
+        modifier = Modifier
+            .width(70.dp)
+            .clickable { onClick() } // Make it clickable
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -591,9 +597,84 @@ fun AchievementItem(achievement: Achievement) {
         Text(
             text = achievement.title,
             style = MaterialTheme.typography.bodySmall,
-            color = if (achievement.isUnlocked) Color.Black else Color.Gray,
+            color = if (achievement.isUnlocked) MaterialTheme.colorScheme.onSurface else Color.Gray,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
+
+@Composable
+fun AchievementDetailDialog(
+    achievement: Achievement,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E1E), // Dark background as requested
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header (Example hardcoded "Hush-Hush" not needed, just Achievement Title)
+                Text(achievement.title, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                
+                Spacer(Modifier.height(24.dp))
+                
+                // Icon Hexagon (Simulated with Box)
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(Color(0xFF2D2D2D), RoundedCornerShape(16.dp)) // Darker Hexagon placeholder
+                        .border(2.dp, if (achievement.isUnlocked) GymGreen else Color.Gray, RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = achievement.icon,
+                        contentDescription = null,
+                        tint = if (achievement.isUnlocked) GymGreen else Color.Gray,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    text = achievement.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(Modifier.height(8.dp))
+                
+                Text(
+                    text = if (achievement.isUnlocked) "You have unlocked this achievement!" else "Keep training to unlock this badge.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    text = if (achievement.isUnlocked) "Unlocked" else "Locked",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (achievement.isUnlocked) GymGreen else Color.Gray,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = Color.White)
+            }
+        }
+    )
+}
+
+

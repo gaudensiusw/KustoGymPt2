@@ -8,6 +8,7 @@ interface AdminRepository {
     fun getAllUsersStream(): Flow<List<UserProfile>>
     fun getAllBookingsStream(): Flow<List<Booking>> // <--- Tambahkan ini
     fun getAllClassesStream(): Flow<List<GymClass>> // <--- TAMBAHKAN INI
+    fun getTransactionsStream(): Flow<List<Transaction>> // <--- Logic Baru Revenue
     suspend fun updateUserRole(userId: String, newRole: String)
     suspend fun deleteUser(userId: String)
 

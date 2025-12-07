@@ -41,3 +41,4 @@ val AdminPrimaryColor = Color(0xFF4CAF50)      // Hijau Utama
 val AdminBgColor = Color(0xFFF5F7FA)           // Abu-abu sangat muda (Background)
 val CardBgColor = Color.White                  // Warna kartu putih bersih
 val ErrorRed = Color(0xFFB00020)       // Untuk tombol hapus notifikasi
+val SurfaceDarkAdmin = Color(0xFF2C2C2C) // Slightly lighter dark surface (Grey 900 -> Grey 850 equivalent ish)

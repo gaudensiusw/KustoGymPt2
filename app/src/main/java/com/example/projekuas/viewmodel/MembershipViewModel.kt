@@ -82,8 +82,30 @@ class MembershipViewModel(
             // Update langsung ke Firestore
             // Tidak perlu update UI manual di sini, karena 'collect' di fetchUserData
             // akan otomatis mendeteksi perubahan di database dan mengupdate UI.
+            
+            // 1. Update Membership User
             db.collection("users").document(uid)
                 .update(updates)
+                .addOnSuccessListener {
+                    // 2. [REVENUE LOGIC] Catat Transaksi Pembelian Membership
+                    val price = when(planName.lowercase()) {
+                        "elite" -> 999000.0
+                        "premium" -> 599000.0
+                        else -> 299000.0 // Basic
+                    }
+                    
+                    val transactionData = hashMapOf(
+                        "id" to db.collection("transactions").document().id,
+                        "userId" to uid,
+                        "userName" to (_uiState.value.userProfile.name),
+                        "type" to "Membership",
+                        "amount" to price,
+                        "dateMillis" to System.currentTimeMillis(),
+                        "description" to "Upgrade to $planName"
+                    )
+                    
+                    db.collection("transactions").add(transactionData)
+                }
                 .addOnFailureListener {
                     // Handle error jika perlu, misal kembalikan loading ke false
                     _uiState.value = _uiState.value.copy(isLoading = false)

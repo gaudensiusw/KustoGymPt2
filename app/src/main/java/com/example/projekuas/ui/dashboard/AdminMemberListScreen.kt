@@ -11,13 +11,18 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.unit.sp
 import com.example.projekuas.data.UserProfile
 import com.example.projekuas.ui.components.ConfirmationDialog
 import com.example.projekuas.ui.components.RoleSelectionDialog
@@ -30,24 +35,27 @@ fun AdminMemberListScreen(
     onNavigateBack: () -> Unit
 ) {
     val members by viewModel.memberList.collectAsState()
+    var searchQuery by remember { mutableStateOf("") } // Search State
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRoleDialog by remember { mutableStateOf(false) }
     var selectedUser by remember { mutableStateOf<UserProfile?>(null) }
 
+    // Filter Logic
+    val filteredMembers = members.filter { 
+        it.name.contains(searchQuery, ignoreCase = true) || it.email.contains(searchQuery, ignoreCase = true)
+    }
+
     if (showDeleteDialog && selectedUser != null) {
         ConfirmationDialog(
-            title = "Hapus Member?",
-            message = "Apakah Anda yakin ingin menghapus ${selectedUser?.name}? Data tidak dapat dikembalikan.",
+            title = "Delete Member?",
+            message = "Are you sure you want to delete ${selectedUser?.name}? This cannot be undone.",
             onConfirm = {
                 selectedUser?.let { viewModel.deleteUser(it.userId) }
                 showDeleteDialog = false
                 selectedUser = null
             },
-            onDismiss = {
-                showDeleteDialog = false
-                selectedUser = null
-            }
+            onDismiss = { showDeleteDialog = false; selectedUser = null }
         )
     }
 
@@ -59,46 +67,70 @@ fun AdminMemberListScreen(
                 showRoleDialog = false
                 selectedUser = null
             },
-            onDismiss = {
-                showRoleDialog = false
-                selectedUser = null
-            }
+            onDismiss = { showRoleDialog = false; selectedUser = null }
         )
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Manajemen Member", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Back") } },
-                // FIX: Warna TopBar agar adaptif
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color(0xFF16A34A), Color(0xFF166534))
+                        )
+                    )
+                    .padding(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Text("Manage Members", color = Color.White, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding)) {
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                placeholder = { Text("Search by name or email") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AdminGreenPrimary,
+                    cursorColor = AdminGreenPrimary
                 )
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background // FIX: Background adaptif
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(members) { member ->
-                AdminUserCard(
-                    user = member,
-                    // FIX: Gunakan warna Primary dari tema, atau tetap biru jika ingin branding
-                    iconColor = MaterialTheme.colorScheme.primary,
-                    onDeleteClick = {
-                        selectedUser = member
-                        showDeleteDialog = true
-                    },
-                    onEditRoleClick = {
-                        selectedUser = member
-                        showRoleDialog = true
-                    }
-                )
+
+            LazyColumn(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
+            ) {
+                items(filteredMembers) { member ->
+                    AdminUserCard(
+                        user = member,
+                        iconColor = AdminGreenPrimary, 
+                        onDeleteClick = {
+                            selectedUser = member
+                            showDeleteDialog = true
+                        },
+                        onEditRoleClick = {
+                            selectedUser = member
+                            showRoleDialog = true
+                        }
+                    )
+                }
             }
         }
     }
@@ -114,9 +146,8 @@ fun AdminUserCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        // FIX: Warna Card Adaptif (Surface)
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -124,16 +155,20 @@ fun AdminUserCard(
         ) {
             Surface(
                 shape = CircleShape,
-                color = iconColor.copy(alpha = 0.2f),
-                modifier = Modifier.size(48.dp)
+                color = iconColor.copy(alpha = 0.1f),
+                modifier = Modifier.size(50.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Person, null, tint = iconColor)
+                    Text(
+                        text = user.name.take(1).uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        color = iconColor,
+                        fontSize = 20.sp
+                    )
                 }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                // FIX: Warna Teks Adaptif
                 Text(
                     text = user.name.ifBlank { "No Name" },
                     fontWeight = FontWeight.Bold,
@@ -146,7 +181,7 @@ fun AdminUserCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Row(modifier = Modifier.clickable { onEditRoleClick() }.padding(top = 4.dp)) {
+                Row(modifier = Modifier.clickable { onEditRoleClick() }.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = user.role, style = MaterialTheme.typography.labelSmall, color = iconColor, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp), tint = iconColor)

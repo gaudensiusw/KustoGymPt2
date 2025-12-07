@@ -63,6 +63,9 @@ data class TrainerUiState(
     val classesThisMonthCount: Int = 0,
     val performanceRate: Double = 0.0, // Attendance Rate sebagai proxy Satisfaction
     val myMembers: List<MemberStatItem> = emptyList(),
+    val rating: Double = 0.0, // NEW: Bintang
+    val ratingCount: Int = 0,  // NEW: Jumlah Review
+    val reviews: List<Booking> = emptyList() // NEW: Daftar Review
 )
 
 // Helper Class untuk hasil perhitungan
@@ -90,6 +93,7 @@ class TrainerViewModel(
 
     init {
         fetchTrainerProfile()
+        observeReviews() // Start observing reviews
 
         viewModelScope.launch {
             refreshTrigger
@@ -135,9 +139,25 @@ class TrainerViewModel(
                 val profile = profileRepository.getLoggedInUserProfile().first()
                 // FIX: Pastikan nama trainer disimpan
                 val name = profile.name.ifBlank { trainerNamePlaceholder }
-                _uiState.update { it.copy(trainerName = name) }
+                _uiState.update { 
+                    it.copy(
+                        trainerName = name,
+                        rating = profile.averageRating, // Load Rating
+                        ratingCount = profile.ratingCount
+                    ) 
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(trainerName = trainerNamePlaceholder) }
+            }
+        }
+    }
+
+    private fun observeReviews() {
+        viewModelScope.launch {
+            if (trainerId.isNotBlank()) {
+                classRepository.getTrainerReviews(trainerId).collect { reviews ->
+                    _uiState.update { it.copy(reviews = reviews) }
+                }
             }
         }
     }

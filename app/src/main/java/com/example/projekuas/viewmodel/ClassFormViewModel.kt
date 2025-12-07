@@ -31,7 +31,8 @@ data class ClassFormState(
     val dateDisplay: String = "",
     // Menyimpan ID kelas yang sedang di-edit (jika tidak null, ini mode EDIT)
     val classIdToEdit: String? = null,
-    val currentImageUrl: String = "" // Untuk menyimpan string Base64 gambar
+    val currentImageUrl: String = "", // Untuk menyimpan string Base64 gambar
+    val isReadOnly: Boolean = false
 )
 
 class ClassFormViewModel(
@@ -152,7 +153,9 @@ class ClassFormViewModel(
                 currentImageUrl = gymClass.imageUrl,
 
                 error = null,
-                isSaved = false
+                isSaved = false,
+                // Check status. If not Upcoming, it's read-only.
+                isReadOnly = gymClass.status != "Upcoming"
             )
         }
     }

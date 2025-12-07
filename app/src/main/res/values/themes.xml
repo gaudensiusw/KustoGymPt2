@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Theme System Splash Screen -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/logo_kusto_gym</item>
+        <item name="postSplashScreenTheme">@style/Theme.ProjekUAS</item>
+    </style>
+
     <style name="Theme.ProjekUAS" parent="android:Theme.Material.Light.NoActionBar">
     <item name="colorPrimary">@color/trainer_primary</item>
 

@@ -57,8 +57,8 @@ private val AdminDarkScheme = darkColorScheme(
     primary = GymGreenDark,       // Hijau Tua
     secondary = GymOrange,
     background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceContainer = SurfaceDark,
+    surface = SurfaceDarkAdmin, // Make cards lighter in dark mode
+    surfaceContainer = SurfaceDarkAdmin,
     onPrimary = TextWhite,
     onSurface = TextWhite
 )

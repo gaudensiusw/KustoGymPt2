@@ -49,11 +49,11 @@ class ReportViewModel(
 
             // --- DATA DUMMY (Ganti dengan data asli dari database/API) ---
             val monthlyData = listOf(
-                MonthlyData("Jul", 5_000_000),
-                MonthlyData("Agu", 7_500_000),
-                MonthlyData("Sep", 12_000_000),
-                MonthlyData("Okt", 15_000_000),
-                MonthlyData("Nov", 18_000_000)
+                MonthlyData("Jul", 5_000_000.0),
+                MonthlyData("Agu", 7_500_000.0),
+                MonthlyData("Sep", 12_000_000.0),
+                MonthlyData("Okt", 15_000_000.0),
+                MonthlyData("Nov", 18_000_000.0)
             )
 
             val maxRev = monthlyData.maxOfOrNull { it.revenue }?.toDouble() ?: 0.0

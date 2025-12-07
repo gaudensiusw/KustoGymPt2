@@ -20,12 +20,26 @@ data class GymClass(
     val rating: Int = 0,    // Tambahkan ini agar ClassItemCard bisa memeriksa rating
     val review: String = "", // Ulasan
     val isRated: Boolean = false, // Opsional, tapi mempermudah UI
+    val ratingTimestamp: Long = 0L, // [NEW] Untuk 12h edit window
 
     // FIX 1: Mapping nama field. Di database namanya "available", di sini "isAvailable"
     @get:PropertyName("available")
     @set:PropertyName("available")
     var isAvailable: Boolean = true
 ) {
+    @get:Exclude
+    val status: String
+        get() {
+            val now = System.currentTimeMillis()
+            val endTime = startTimeMillis + (durationMinutes * 60 * 1000)
+
+            return when {
+                now < startTimeMillis -> "Upcoming"
+                now >= startTimeMillis && now < endTime -> "Ongoing"
+                else -> "Finished"
+            }
+        }
+
     @get:Exclude
     // FIX 2: Tambahkan @Exclude agar Firestore MENGABAIKAN ini (tidak dianggap error)
     val timeString: String

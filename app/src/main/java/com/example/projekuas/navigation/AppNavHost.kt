@@ -1,12 +1,23 @@
 package com.example.projekuas.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
@@ -18,11 +29,12 @@ import com.example.projekuas.data.ClassRepositoryImpl
 import com.example.projekuas.data.ProfileRepositoryImpl
 import com.example.projekuas.data.WorkoutDataRepositoryImpl
 import com.example.projekuas.data.WorkoutLogDao
-import com.example.projekuas.ui.chat.ChatScreen
 
 // --- Import Screens ---
+import com.example.projekuas.ui.chat.ChatScreen
 import com.example.projekuas.ui.classform.ClassFormScreen
-import com.example.projekuas.ui.home.HomeScreen
+import com.example.projekuas.ui.dashboard.TrainerReviewsScreen
+import com.example.projekuas.ui.home.* // Import MemberDashboard & Components
 import com.example.projekuas.ui.login.LoginScreen
 import com.example.projekuas.ui.profile.MembershipScreen
 import com.example.projekuas.ui.profile.ProfileScreen
@@ -30,23 +42,41 @@ import com.example.projekuas.ui.signup.SignUpScreen
 import com.example.projekuas.ui.workoutlog.WorkoutLogScreen
 import com.example.projekuas.ui.dashboard.AdminReportsScreen
 import com.example.projekuas.ui.dashboard.TrainerListScreen
-// MemberDetailScreen tidak diimport disini karena sudah ada di HomeNavHost (Nested)
 import com.example.projekuas.ui.workout.ActiveWorkoutScreen
 import com.example.projekuas.ui.workout.ExerciseSelectionScreen
-import com.example.projekuas.viewmodel.AdminViewModel
+
+// Import Additional Screens
+import com.example.projekuas.ui.booking.ClassBookingScreen
+import com.example.projekuas.ui.components.FloatingBottomNavigation
+import com.example.projekuas.ui.dashboard.AdminClassListScreen
+import com.example.projekuas.ui.dashboard.AdminDashboardScreen
+import com.example.projekuas.ui.dashboard.AdminMemberListScreen
+import com.example.projekuas.ui.dashboard.AdminTrainerListScreen
+import com.example.projekuas.ui.dashboard.MemberDetailScreen
+import com.example.projekuas.ui.dashboard.NotificationScreen
+import com.example.projekuas.ui.dashboard.TrainerDashboardScreen
+import com.example.projekuas.ui.dashboard.TrainerMembersScreen
+import com.example.projekuas.ui.dashboard.TrainerNotificationScreen
+import com.example.projekuas.ui.dashboard.TrainerScheduleScreen
+import com.example.projekuas.ui.theme.GymPurple
+import com.example.projekuas.ui.workout.WorkoutTrackerScreen
 
 // --- Import ViewModels ---
+import com.example.projekuas.viewmodel.AdminViewModel
 import com.example.projekuas.viewmodel.AuthViewModelFactory
 import com.example.projekuas.viewmodel.ChatViewModel
+import com.example.projekuas.viewmodel.ClassBookingViewModel
+import com.example.projekuas.viewmodel.DashboardViewModel
 import com.example.projekuas.viewmodel.HomeViewModelFactory
 import com.example.projekuas.viewmodel.MembershipViewModel
 import com.example.projekuas.viewmodel.ProfileViewModelFactory
 import com.example.projekuas.viewmodel.ThemeViewModel
+import com.example.projekuas.viewmodel.TrainerListViewModel
+import com.example.projekuas.viewmodel.TrainerViewModel
 import com.example.projekuas.viewmodel.WorkoutLogViewModelFactory
+import com.example.projekuas.viewmodel.WorkoutViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
-
-// --- Import Firebase ---
 import com.google.firebase.firestore.firestore
 import com.google.firebase.storage.storage
 
@@ -57,6 +87,21 @@ fun AppNavHost(
 ){
     val context = LocalContext.current
     val navController = rememberNavController()
+    
+    // --- 0. State Navigasi untuk Bottom Bar ---
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    
+    // Tentukan kapan Bottom Bar muncul
+    // Muncul jika BUKAN Login, SignUp, atau ActiveWorkout (full screen)
+    val showBottomBar = currentRoute != NavDestinations.LOGIN && 
+                       currentRoute != NavDestinations.SIGN_UP &&
+                       currentRoute != HomeNavDestinations.ActiveWorkout.route &&
+                       // Sembunyikan Bottom Bar di halaman Form & Detail & Chat & Reviews agar tidak menumpuk
+                       currentRoute?.startsWith(HomeNavDestinations.ClassForm.route) != true &&
+                       currentRoute?.startsWith("member_detail") != true &&
+                       currentRoute?.startsWith("chat_screen") != true &&
+                       currentRoute != "trainer_reviews"
 
     // Inisialisasi Firebase
     val firebaseAuth = Firebase.auth
@@ -82,7 +127,6 @@ fun AppNavHost(
         WorkoutDataRepositoryImpl(firebaseFirestore)
     }
 
-    // FIX 1: Inisialisasi ChatRepository (Ini yang sebelumnya hilang)
     val chatRepository = remember { ChatRepository(firebaseFirestore) }
 
     // --- 2. Initialize Factories ---
@@ -102,7 +146,7 @@ fun AppNavHost(
             profileRepository,
             classRepository,
             adminRepository,
-            chatRepository // Sekarang ini tidak error karena chatRepository sudah dibuat di atas
+            chatRepository
         )
     }
 
@@ -116,8 +160,14 @@ fun AppNavHost(
     val workoutLogFactory = remember {
         WorkoutLogViewModelFactory(workoutDataRepository, authRepository)
     }
+    
+    // ViewModel Global untuk Dashboard Logic
+    // Kita inisialisasi di sini agar state userRole bisa diakses untuk routing
+    val dashboardGlobalViewModel: DashboardViewModel = viewModel(factory = homeFactory)
+    val dashboardState by dashboardGlobalViewModel.dashboardState.collectAsState()
+    val userRole = dashboardState.userRole
 
-    // --- 3. Definisi Aksi Navigasi (Navigation Actions) ---
+    // --- 3. Definisi Aksi Navigasi Reuse ---
     val navigateToClassForm = { classId: String? ->
         if (classId != null) {
             navController.navigate("${HomeNavDestinations.ClassForm.route}?classId=$classId")
@@ -125,195 +175,319 @@ fun AppNavHost(
             navController.navigate(HomeNavDestinations.ClassForm.route)
         }
     }
-
-    val navigateToActiveWorkout = {
-        navController.navigate(HomeNavDestinations.ActiveWorkout.route)
-    }
-
-    val navigateToSelection = { muscleGroup: String ->
-        navController.navigate("${HomeNavDestinations.ExerciseSelection.route}/$muscleGroup")
-    }
-
-    val navigateToAdminReports = {
-        navController.navigate(HomeNavDestinations.AdminReports.route)
-    }
-
-    val navigateToMembership = {
-        navController.navigate(HomeNavDestinations.Membership.route)
-    }
-
-    // --- 4. Navigation Host ---
-    NavHost(
-        navController = navController,
-        startDestination = NavDestinations.LOGIN
-    ) {
-        // --- Rute Login ---
-        composable(NavDestinations.LOGIN) {
-            LoginScreen(
-                viewModel = viewModel(factory = authFactory),
-                onNavigateToSignUp = { navController.navigate(NavDestinations.SIGN_UP) },
-                onLoginSuccess = {
-                    navController.navigate(NavDestinations.HOME) {
-                        popUpTo(NavDestinations.LOGIN) { inclusive = true }
-                    }
-                }
-            )
+    
+    // --- 4. Navigation Host dengan Scaffold ---
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                FloatingBottomNavigation(navController = navController, role = userRole)
+            }
+        }
+    ) { innerPadding ->
+        // Kita gunakan Box lagi jika butuh kontrol padding manual, 
+        // tapi Scaffold sudah handle padding dasar. 
+        // FloatingBottomNavigation kita "melayang" dan punya custom box sendiri.
+        
+        val startDestination = if (firebaseAuth.currentUser != null) {
+            HomeNavDestinations.Dashboard.route
+        } else {
+            NavDestinations.LOGIN
         }
 
-        // --- Rute Sign Up ---
-        composable(NavDestinations.SIGN_UP) {
-            SignUpScreen(
-                // PERBAIKAN: Gunakan 'homeFactory' (sesuai nama variabel di atas), bukan 'factory'
-                factory = homeFactory,
-
-                // Callback navigasi baru sesuai SignUpScreen yang sudah diupdate
-                onNavigateToLogin = {
-                    navController.navigate(NavDestinations.LOGIN) {
-                        popUpTo(NavDestinations.SIGN_UP) { inclusive = true }
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // --- Rute Login ---
+            composable(NavDestinations.LOGIN) {
+                LoginScreen(
+                    viewModel = viewModel(factory = authFactory),
+                    onNavigateToSignUp = { navController.navigate(NavDestinations.SIGN_UP) },
+                    onLoginSuccess = {
+                        // Setelah login sukses, arahkan ke Dashboard
+                        navController.navigate(HomeNavDestinations.Dashboard.route) {
+                            popUpTo(NavDestinations.LOGIN) { inclusive = true }
+                        }
                     }
-                }
-            )
-        }
-
-        // --- Rute HOME (Dashboard Utama) ---
-        composable(NavDestinations.HOME) {
-            HomeScreen(
-                factory = homeFactory,
-                themeViewModel = themeViewModel, // <-- Teruskan ini!
-                onNavigateToProfile = { navController.navigate(NavDestinations.PROFILE) },
-                onNavigateToWorkoutLog = { navController.navigate(NavDestinations.WORKOUT_LOG) },
-                onNavigateToClassForm = navigateToClassForm,
-                onNavigateToAdminReports = { navController.navigate(HomeNavDestinations.AdminReports.route) },
-                onNavigateToActiveWorkout = { navController.navigate(HomeNavDestinations.ActiveWorkout.route) },
-                onNavigateToSelection = { mg -> navController.navigate("${HomeNavDestinations.ExerciseSelection.route}/$mg") },
-                onNavigateToMembership = { navController.navigate(HomeNavDestinations.Membership.route) },
-                onLogout = {
-                    navController.navigate(NavDestinations.LOGIN) {
-                        popUpTo(NavDestinations.HOME) {
-                            inclusive = true
+                )
+            }
+    
+            // --- Rute Sign Up ---
+            composable(NavDestinations.SIGN_UP) {
+                SignUpScreen(
+                    factory = homeFactory,
+                    onNavigateToLogin = {
+                        navController.navigate(NavDestinations.LOGIN) {
+                            popUpTo(NavDestinations.SIGN_UP) { inclusive = true }
+                        }
+                    }
+                )
+            }
+    
+            // ===========================================
+            // --- MAIN TABS (BOTTOM NAVIGATION) ---
+            // ===========================================
+            
+            // 1. DASHBOARD (HOME)
+            composable(HomeNavDestinations.Dashboard.route) {
+                // Gunakan User Role untuk menentukan Dashboard mana yang muncul
+                val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+                
+                when (userRole) {
+                    "Admin" -> {
+                        AdminDashboardScreen(
+                            viewModel = adminViewModel,
+                            themeViewModel = themeViewModel,
+                            name = dashboardState.name,
+                            onNavigateToReports = { navController.navigate(HomeNavDestinations.AdminReports.route) },
+                            onNavigateToTrainers = { navController.navigate("trainer_list") },
+                            onNavigateToChat = { navController.navigate("member_chat_list") },
+                            onNavigateToClasses = { navController.navigate("admin_class_list") }
+                        )
+                    }
+                    "Trainer" -> {
+                        TrainerDashboardScreen(
+                            factory = homeFactory,
+                            themeViewModel = themeViewModel,
+                            onNavigateToClassForm = navigateToClassForm,
+                            onNavigateToSchedule = {
+                                navController.navigate(HomeNavDestinations.Kelas.route)
+                            },
+                            onNavigateToMembers = {
+                                navController.navigate(TRAINER_MEMBERS_ROUTE)
+                            },
+                            onNavigateToReviews = {
+                                navController.navigate("trainer_reviews")
+                            },
+                            onNavigateToNotifications = {
+                                navController.navigate("trainer_notifications")
+                            }
+                        )
+                    }
+                    "Member" -> {
+                        val classBookingViewModel: ClassBookingViewModel = viewModel(factory = homeFactory)
+                        MemberDashboardScreen(
+                            dashboardViewModel = dashboardGlobalViewModel,
+                            classViewModel = classBookingViewModel,
+                            themeViewModel = themeViewModel,
+                            onNavigateToBooking = { navController.navigate(HomeNavDestinations.Kelas.route) },
+                            onNavigateToWorkoutLog = { navController.navigate(HomeNavDestinations.Latihan.route) },
+                            onNavigateToMembership = { navController.navigate(HomeNavDestinations.Membership.route) },
+                            onNavigateToProfileTab = { navController.navigate(HomeNavDestinations.Profil.route) },
+                            onNavigateToSelection = { mg -> navController.navigate("${HomeNavDestinations.ExerciseSelection.route}/$mg") },
+                            onNavigateToActiveWorkout = { navController.navigate(HomeNavDestinations.ActiveWorkout.route) },
+                            onNavigateToNotifications = { navController.navigate("notifications") },
+                            onNavigateToChatList = { navController.navigate("chat_list") }
+                        )
+                    }
+                    else -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = GymPurple)
                         }
                     }
                 }
-            )
-        }
-
-
-
-        // --- Rute Profile ---
-        composable(NavDestinations.PROFILE) {
-            ProfileScreen(
-                viewModel = viewModel(factory = profileFactory),
-                onNavigateBack = { navController.popBackStack() },
-                onLogout = {
-                    navController.navigate(NavDestinations.LOGIN) {
-                        popUpTo(NavDestinations.HOME) { inclusive = true }
+            }
+            
+            // 2. KELAS (SCHEDULE/BOOKING)
+            composable(HomeNavDestinations.Kelas.route) {
+                // Logic role user untuk menampilkan Trainer Schedule atau Member Booking
+                val currentRole = if (userRole.isNotBlank()) userRole else "Member" // Default fallback
+                
+                if (currentRole == "Trainer") {
+                    TrainerScheduleScreen(factory = homeFactory, onNavigateToClassForm = navigateToClassForm)
+                } else {
+                    val classBookingViewModel: ClassBookingViewModel = viewModel(factory = homeFactory)
+                    ClassBookingScreen(
+                        viewModel = classBookingViewModel, 
+                        // Back ke Dashboard jika tekan back system, tapi di bottom nav user bisa klik tab lain
+                        onNavigateBack = { navController.navigate(HomeNavDestinations.Dashboard.route) }
+                    )
+                }
+            }
+            
+            // 3. LATIHAN (WORKOUT TRACKER)
+            composable(HomeNavDestinations.Latihan.route) {
+                val workoutViewModel: WorkoutViewModel = viewModel(factory = homeFactory)
+                WorkoutTrackerScreen(
+                    viewModel = workoutViewModel, 
+                    onNavigateBack = { navController.popBackStack() }, 
+                    onNavigateToSelection = { mg -> navController.navigate("${HomeNavDestinations.ExerciseSelection.route}/$mg") }, 
+                    onNavigateToActiveWorkout = { navController.navigate(HomeNavDestinations.ActiveWorkout.route) }
+                )
+            }
+            
+            // 4. PROFIL
+            composable(HomeNavDestinations.Profil.route) {
+                ProfileScreen(
+                    viewModel = viewModel(factory = profileFactory), 
+                    onLogout = {
+                        navController.navigate(NavDestinations.LOGIN) {
+                            popUpTo(HomeNavDestinations.Dashboard.route) { inclusive = true }
+                        }
+                    }, 
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+    
+            // ===========================================
+            // --- OTHER FEATURES ---
+            // ===========================================
+    
+            // Membership Status
+            composable(HomeNavDestinations.Membership.route) {
+                val membershipViewModel: MembershipViewModel = viewModel(factory = homeFactory)
+                MembershipScreen(
+                    viewModel = membershipViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+    
+            // Workout Log History (Mungkin berbeda dengan Latihan Tab)
+            composable(NavDestinations.WORKOUT_LOG) {
+                WorkoutLogScreen(
+                    viewModel = viewModel(factory = workoutLogFactory),
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
+    
+            // Class Form (Add/Edit)
+            composable(
+                route = "${HomeNavDestinations.ClassForm.route}?classId={classId}",
+                arguments = listOf(navArgument("classId") {
+                    type = NavType.StringType; nullable = true; defaultValue = null
+                })
+            ) { backStackEntry ->
+                ClassFormScreen(
+                    factory = homeFactory,
+                    classIdToEdit = backStackEntry.arguments?.getString("classId"),
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
-                },
-            )
-        }
-
-        // --- Rute Membership ---
-        composable(HomeNavDestinations.Membership.route) {
-            val membershipViewModel: MembershipViewModel = viewModel(factory = homeFactory)
-            MembershipScreen(
-                viewModel = membershipViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // --- Rute Workout Log ---
-        composable(NavDestinations.WORKOUT_LOG) {
-            WorkoutLogScreen(
-                viewModel = viewModel(factory = workoutLogFactory),
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-
-        // --- Rute Class Form (Add/Edit Class) ---
-        composable(
-            route = "${HomeNavDestinations.ClassForm.route}?classId={classId}",
-            arguments = listOf(navArgument("classId") {
-                type = NavType.StringType; nullable = true; defaultValue = null
-            })
-        ) { backStackEntry ->
-            ClassFormScreen(
-                factory = homeFactory,
-                classIdToEdit = backStackEntry.arguments?.getString("classId"),
-                onNavigateBack = {
-                    navController.navigate(NavDestinations.HOME) {
-                        popUpTo(NavDestinations.HOME) { inclusive = true }
+                )
+            }
+            
+            // Active Workout
+            composable(HomeNavDestinations.ActiveWorkout.route) {
+                ActiveWorkoutScreen(
+                    viewModel = viewModel(factory = homeFactory),
+                    onFinish = {
+                        navController.popBackStack()
                     }
-                }
-            )
-        }
+                )
+            }
+            
+            // Exercise Selection
+            composable(
+                route = "${HomeNavDestinations.ExerciseSelection.route}/{muscleGroup}",
+                arguments = listOf(navArgument("muscleGroup") { type = NavType.StringType })
+            ) { backStackEntry ->
+                ExerciseSelectionScreen(
+                    viewModel = viewModel(factory = homeFactory),
+                    muscleGroup = backStackEntry.arguments?.getString("muscleGroup") ?: "",
+                    onNavigateToActiveWorkout = {
+                        navController.navigate(HomeNavDestinations.ActiveWorkout.route)
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+    
+            // Notification
+            composable("notifications") { 
+                NotificationScreen(onNavigateBack = { navController.popBackStack() }) 
+            }
+            
+            // Chat List (Member view of Trainers)
+            composable("chat_list") {
+                val trainerListViewModel: TrainerListViewModel = viewModel(factory = homeFactory)
+                TrainerListScreen(
+                    viewModel = trainerListViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToChat = { trainerId -> navController.navigate("chat_screen/$trainerId") }
+                )
+            }
+            
+            // Trainer Reviews
+            composable("trainer_reviews") {
+                TrainerReviewsScreen(
+                     factory = homeFactory,
+                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        // --- Rute Admin Reports ---
-        composable(HomeNavDestinations.AdminReports.route) {
-            // [FIX] Buat ViewModel di sini menggunakan factory
-            val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+            // Chat Screen
+            composable(
+                route = "chat_screen/{trainerId}",
+                arguments = listOf(navArgument("trainerId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val trainerId = backStackEntry.arguments?.getString("trainerId") ?: ""
+                val chatViewModel: com.example.projekuas.viewmodel.ChatViewModel = viewModel(factory = homeFactory)
+                ChatScreen(
+                    viewModel = chatViewModel,
+                    otherUserId = trainerId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-            // [FIX] Kirim viewModel ke AdminReportsScreen
-            AdminReportsScreen(
-                viewModel = adminViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            // Trainer's Member List
+            composable(TRAINER_MEMBERS_ROUTE) {
+                TrainerMembersScreen(
+                    factory = homeFactory, 
+                    onNavigateUp = { navController.popBackStack() }, 
+                    onNavigateToDetail = { memberId -> 
+                        if (memberId.isNotBlank()) navController.navigate("member_detail/$memberId") 
+                    }
+                )
+            }
+            
+            // Member Detail (for Trainer)
+            composable(MEMBER_DETAIL_ROUTE, arguments = listOf(navArgument("memberId") { type = NavType.StringType })) { backStackEntry ->
+                val trainerViewModel: TrainerViewModel = viewModel(factory = homeFactory)
+                val memberId = backStackEntry.arguments?.getString("memberId") ?: ""
+                MemberDetailScreen(navController = navController, viewModel = trainerViewModel, memberId = memberId)
+            }
 
-        // Rute Exercise Selection
-        composable(
-            route = "${HomeNavDestinations.ExerciseSelection.route}/{muscleGroup}",
-            arguments = listOf(navArgument("muscleGroup") { type = NavType.StringType })
-        ) { backStackEntry ->
-            ExerciseSelectionScreen(
-                viewModel = viewModel(factory = homeFactory),
-                muscleGroup = backStackEntry.arguments?.getString("muscleGroup") ?: "",
-                onNavigateToActiveWorkout = {
-                    navController.navigate(HomeNavDestinations.ActiveWorkout.route)
-                },
-                // INI WAJIB DITAMBAHKAN:
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            // Trainer Notifications
+            composable("trainer_notifications") {
+                TrainerNotificationScreen(onNavigateBack = { navController.popBackStack() })
+            }
+    
+            // Admin Member List
+            composable("member_chat_list") {
+                val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+                AdminMemberListScreen(
+                    viewModel = adminViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            
+            // Admin Trainer List
+            composable("trainer_list") {
+                val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+                AdminTrainerListScreen(
+                    viewModel = adminViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            
+            // Admin Class List
+            composable("admin_class_list") {
+                val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+                AdminClassListScreen(
+                    viewModel = adminViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToForm = navigateToClassForm
+                )
+            }
 
-        // Rute TRAINER LIST (Daftar Pelatih)
-        /*composable("trainer_list") {
-            TrainerListScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToChat = { trainerId ->
-                    navController.navigate("chat_screen/$trainerId")
-                }
-            )
-        *///}
-
-        // --- Rute Chat Screen (REALTIME) ---
-        composable(
-            route = "chat_screen/{otherUserId}",
-            arguments = listOf(navArgument("otherUserId") { type = NavType.StringType })
-        ) { backStackEntry ->
-
-            // FIX 2: Menggunakan 'homeFactory' (nama variabel yang benar), bukan 'factory'
-            val chatViewModel: ChatViewModel = viewModel(factory = homeFactory)
-
-            val otherUserId = backStackEntry.arguments?.getString("otherUserId") ?: ""
-
-            ChatScreen(
-                viewModel = chatViewModel,
-                otherUserId = otherUserId,
-                onNavigateBack = {
-                    // Kembali ke layar sebelumnya
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        // --- Rute Active Workout ---
-        composable(HomeNavDestinations.ActiveWorkout.route) {
-            ActiveWorkoutScreen(
-                viewModel = viewModel(factory = homeFactory),
-                onFinish = {
-                    navController.popBackStack()
-                }
-            )
+            // Admin Reports
+            composable(HomeNavDestinations.AdminReports.route) {
+                val adminViewModel: AdminViewModel = viewModel(factory = homeFactory)
+                AdminReportsScreen(
+                    viewModel = adminViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

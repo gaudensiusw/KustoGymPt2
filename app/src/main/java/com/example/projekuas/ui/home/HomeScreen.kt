@@ -4,13 +4,9 @@ package com.example.projekuas.ui.home
 
 import android.graphics.BitmapFactory
 import android.util.Base64
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,11 +19,11 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
-import androidx.compose.material3.AlertDialogDefaults.containerColor
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -36,54 +32,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.example.projekuas.R
 import com.example.projekuas.data.GymClass
-import com.example.projekuas.navigation.HomeNavDestinations
-import com.example.projekuas.ui.booking.ClassBookingScreen
-import com.example.projekuas.ui.chat.ChatScreen
-import com.example.projekuas.ui.dashboard.AdminDashboardScreen
-import com.example.projekuas.ui.dashboard.MemberDetailScreen
-import com.example.projekuas.ui.dashboard.NotificationScreen
-import com.example.projekuas.ui.dashboard.TrainerDashboardScreen
-import com.example.projekuas.ui.dashboard.TrainerListScreen
-import com.example.projekuas.ui.dashboard.TrainerMembersScreen
-import com.example.projekuas.ui.dashboard.TrainerScheduleScreen
-import com.example.projekuas.ui.profile.MembershipScreen
-import com.example.projekuas.ui.profile.ProfileScreen
-import com.example.projekuas.ui.workout.WorkoutTrackerScreen
+import com.example.projekuas.ui.theme.GymOrange
+import com.example.projekuas.ui.theme.GymPurple
 import com.example.projekuas.utils.rememberBitmapFromBase64
-import com.example.projekuas.viewmodel.AdminViewModel
-import com.example.projekuas.viewmodel.ChatViewModel
 import com.example.projekuas.viewmodel.ClassBookingViewModel
 import com.example.projekuas.viewmodel.DashboardViewModel
-import com.example.projekuas.viewmodel.HomeViewModelFactory
-import com.example.projekuas.viewmodel.MembershipViewModel
 import com.example.projekuas.viewmodel.ThemeViewModel
-import com.example.projekuas.viewmodel.TrainerListViewModel
-import com.example.projekuas.viewmodel.TrainerViewModel
-import com.example.projekuas.viewmodel.WorkoutViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.platform.LocalDensity
-import com.example.projekuas.ui.dashboard.AdminClassListScreen
-import com.example.projekuas.ui.dashboard.AdminMemberListScreen
-import com.example.projekuas.ui.dashboard.AdminReportsScreen
-import com.example.projekuas.ui.dashboard.AdminTrainerListScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.example.projekuas.ui.theme.GymOrange
-import com.example.projekuas.ui.theme.GymPurple
-
 
 // Konstanta Rute
 const val TRAINER_MEMBERS_ROUTE = "trainer_members_route"
@@ -95,13 +56,6 @@ val HomeClassImages = listOf(
     R.drawable.image5,
     R.drawable.image7,
     R.drawable.image9
-)
-
-val bottomNavItems = listOf(
-    HomeNavDestinations.Dashboard,
-    HomeNavDestinations.Kelas,
-    HomeNavDestinations.Latihan,
-    HomeNavDestinations.Profil
 )
 
 fun base64ToBitmapHome(base64String: String): android.graphics.Bitmap? {
@@ -143,6 +97,7 @@ fun MemberDashboardScreen(
 
     // State Refresh
     var isRefreshing by remember { mutableStateOf(false) }
+    var selectedClass by remember { mutableStateOf<GymClass?>(null) } // [NEW] Class Detail State
     val scope = rememberCoroutineScope()
 
     // Fungsi Refresh
@@ -150,11 +105,6 @@ fun MemberDashboardScreen(
         isRefreshing = true
         scope.launch {
             // TODO: Panggil fungsi refresh data dari ViewModel di sini
-            // Contoh:
-            // dashboardViewModel.refreshData()
-            // classViewModel.refreshClasses()
-
-            // Simulasi delay (hapus jika sudah ada data fetching asli)
             delay(1500)
             isRefreshing = false
         }
@@ -182,17 +132,17 @@ fun MemberDashboardScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(), // Hapus padding(padding) dari sini
-                contentPadding = PaddingValues(bottom = 20.dp) // Tambahan padding bawah agar konten terbawah tidak kepotong
+                contentPadding = PaddingValues(bottom = 120.dp) // Tambahan padding bawah agar konten terbawah tidak kepotong
             ) {
-                // 1. HEADER UNGU
+                // 1. HEADER UNGU (Solid/Dark Gradient)
                 item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(300.dp)
+                            .height(280.dp) // Reduced height slightly
                             .background(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
+                                    colors = listOf(MaterialTheme.colorScheme.primary, Color(0xFF4A148C)) // Purple to Dark Purple
                                 ),
                                 shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                             )
@@ -221,7 +171,7 @@ fun MemberDashboardScreen(
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Column {
-                                        Text("Welcome back,", color = Color.White.copy(0.8f), fontSize = 12.sp)
+                                        Text("Welcome back,", color = Color.White.copy(0.9f), fontSize = 12.sp)
                                         Text(
                                             state.name.ifBlank { "Member" },
                                             color = Color.White,
@@ -246,7 +196,7 @@ fun MemberDashboardScreen(
                                 }
                             }
 
-                            Spacer(Modifier.height(32.dp))
+                            Spacer(Modifier.height(24.dp))
 
                             // Stats Cards Row
                             Row(
@@ -261,26 +211,39 @@ fun MemberDashboardScreen(
                     }
                 }
 
-                // 2. GRID MENU
+                // 2. GRID MENU (Overlapping Card)
                 item {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            MenuButton(Icons.Default.FitnessCenter, "Workout", onNavigateToWorkoutLog)
-                            MenuButton(Icons.Default.CalendarMonth, "Book Class", onNavigateToBooking)
-                            MenuButton(Icons.Default.QrCode, "QR Code", onNavigateToMembership)
-                            MenuButton(Icons.Default.Person, "Profile", onNavigateToProfileTab)
-                        }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .offset(y = (-30).dp), // Negative Offset to Overlap
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(4.dp),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(24.dp)) {
+                            // Row 1 (3 Buttons)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                MenuButton(Icons.Default.FitnessCenter, "Workout", Color(0xFFFFF3E0), Color(0xFFFF9800), onNavigateToWorkoutLog)
+                                MenuButton(Icons.Default.CalendarMonth, "Book Class", Color(0xFFE3F2FD), Color(0xFF2196F3), onNavigateToBooking)
+                                MenuButton(Icons.Default.QrCode, "QR Code", Color(0xFFE8F5E9), Color(0xFF4CAF50), onNavigateToMembership)
+                            }
 
-                        Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(20.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start
-                        ) {
-                            MenuButton(Icons.Default.Chat, "Consultation", onNavigateToChatList)
+                            // Row 2 (2 Buttons)
+                             Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start // Left aligned or maybe SpaceEvenly? Let's use Start with spacing
+                            ) {
+                                MenuButton(Icons.Default.Person, "Profile", Color(0xFFF3E5F5), Color(0xFF9C27B0), onNavigateToProfileTab)
+                                Spacer(Modifier.width(28.dp)) // Manual spacing to align largely with top row columns
+                                MenuButton(Icons.Default.Chat, "Consultation", Color(0xFFFCE4EC), Color(0xFFE91E63), onNavigateToChatList)
+                            }
                         }
                     }
                 }
@@ -295,7 +258,8 @@ fun MemberDashboardScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 items(upcomingClasses) { gymClass ->
-                                    PopularClassItem(gymClass = gymClass, onClick = onNavigateToBooking)
+                                    // FIX: Update onClick to show detail popup
+                                    PopularClassItem(gymClass = gymClass, onClick = { selectedClass = gymClass })
                                 }
                             }
                         }
@@ -305,29 +269,43 @@ fun MemberDashboardScreen(
                 // 4. BANNER MEMBERSHIP
                 item {
                     Spacer(Modifier.height(8.dp))
+                    // Dynamic Card Color
+                    val cardColor = when (state.membershipType.lowercase()) {
+                        "elite", "gold" -> Color(0xFFEAB308) // Gold
+                        "pro", "platinum" -> Color(0xFF3B82F6) // Blue
+                        "standard", "basic" -> Color(0xFF4B5563) // Gray
+                        else -> Color(0xFF212121) // Dark default
+                    }
+                    val textColor = if (cardColor == Color(0xFF212121)) GymOrange else Color.White
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                             .height(100.dp)
                             .clickable { onNavigateToMembership() },
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF212121)),
+                        colors = CardDefaults.cardColors(containerColor = cardColor),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Box(Modifier.fillMaxSize().padding(16.dp)) {
                             Column(Modifier.align(Alignment.CenterStart)) {
-                                Text("Membership Status", color = GymOrange, fontSize = 12.sp)
-                                Text("Elite", color = GymOrange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                Text("Membership Status", color = textColor, fontSize = 12.sp)
+                                Text(state.membershipType.ifBlank { "No Membership" }, color = textColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                             }
-                            Text("View Details >", color = GymOrange, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomEnd))
+                            Text("View Details >", color = textColor, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomEnd))
                         }
                     }
-                    Spacer(Modifier.height(80.dp))
+                    Spacer(Modifier.height(120.dp))
                 }
             }
         }
     }
+
+    if (selectedClass != null) {
+        ClassDetailDialog(gymClass = selectedClass!!, onDismiss = { selectedClass = null })
+    }
 }
+
 
 // --- KOMPONEN PENDUKUNG (Disesuaikan untuk Dark Mode) ---
 
@@ -349,18 +327,16 @@ fun StatCardHeader(icon: ImageVector, value: String, label: String) {
 }
 
 @Composable
-fun MenuButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+fun MenuButton(icon: ImageVector, label: String, bgColor: Color, iconTint: Color, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }) {
         Surface(
             modifier = Modifier.size(70.dp),
             shape = RoundedCornerShape(16.dp),
-            // FIX: Warna Surface mengikuti tema (Putih/Abu Gelap)
-            color = MaterialTheme.colorScheme.surface,
+            color = bgColor, // Custom specific color
             shadowElevation = 2.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
-                // FIX: Icon mengikuti warna Primary
-                Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+                Icon(icon, null, tint = iconTint) // Custom specific tint
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -439,354 +415,11 @@ fun PopularClassItem(gymClass: GymClass, onClick: () -> Unit) {
                     Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(gymClass.trainerName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                }
             }
         }
     }
+
+
 }
 
-// --- ADMIN & USER MANAGEMENT ---
-
-
-// --- MAIN HOMESCREEN WRAPPER ---
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HomeScreen(
-    factory: HomeViewModelFactory,
-    themeViewModel: ThemeViewModel,
-    onNavigateToProfile: () -> Unit,
-    onNavigateToWorkoutLog: () -> Unit,
-    onNavigateToClassForm: (String?) -> Unit,
-    onNavigateToAdminReports: () -> Unit,
-    onNavigateToSelection: (String) -> Unit,
-    onNavigateToActiveWorkout: () -> Unit,
-    onNavigateToMembership: () -> Unit,
-    onLogout: () -> Unit
-) {
-    val navController = rememberNavController()
-    // Hapus variabel navBackStackEntry dan currentDestination di sini
-    // karena sudah dipindahkan ke dalam FloatingBottomNavigation agar lebih bersih
-
-    val dashboardViewModel: DashboardViewModel = viewModel(factory = factory)
-    val dashboardState by dashboardViewModel.dashboardState.collectAsState()
-    val userRole = dashboardState.userRole
-    val density = LocalDensity.current
-    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background, // Warna dasar aplikasi (Hitam/Putih)
-        // HAPUS parameter bottomBar dari sini! Kita pindahkan ke dalam Box.
-    ) { innerPadding ->
-
-        // GUNAKAN BOX UNTUK MENUMPUK KONTEN & NAVIGASI
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-            // PENTING: Jangan pakai padding innerPadding mentah-mentah ke semua sisi
-            // Kita hanya ambil padding bawah sistem jika diperlukan, tapi konten harus full screen
-        ) {
-            HomeNavHost(
-                navController = navController,
-                modifier = Modifier
-                    .fillMaxSize()
-                    // Tambahkan padding bawah manual agar item paling bawah
-                    // di scrollable list (misal jadwal) tidak ketutup navigasi.
-                    // 100.dp adalah estimasi tinggi navigasi + jarak
-                    .padding(bottom = 100.dp),
-                factory = factory,
-                themeViewModel = themeViewModel,
-                userRole = dashboardState.userRole,
-                onLogout = onLogout,
-                onNavigateToWorkoutLog = onNavigateToWorkoutLog,
-                onNavigateToClassForm = onNavigateToClassForm,
-                onNavigateToSelection = onNavigateToSelection,
-                onNavigateToActiveWorkout = onNavigateToActiveWorkout,
-                onNavigateToMembership = onNavigateToMembership,
-                onNavigateToAdminReports = onNavigateToAdminReports
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter) // Taruh di bawah
-                    .padding(bottom = bottomInset) // Hindari garis gesture HP (garis putih bawah iPhone/Android)
-            ) {
-                FloatingBottomNavigation(navController = navController)
-            }
-        }
-    }
-}
-
-@Composable
-fun FloatingBottomNavigation(navController: NavHostController) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-
-    // List menu manual agar lebih fleksibel
-    val items = listOf(
-        HomeNavDestinations.Dashboard,
-        HomeNavDestinations.Kelas,
-        HomeNavDestinations.Latihan,
-        HomeNavDestinations.Profil
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 20.dp) // Mengatur posisi melayang dari bawah
-    ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer, // Warna Pill (Ungu gelap/Putih)
-            tonalElevation = 3.dp,
-            shadowElevation = 10.dp,
-            shape = RoundedCornerShape(50.dp), // Bentuk Pill Oval Sempurna
-            modifier = Modifier.height(70.dp).fillMaxWidth() // Tinggi kotak oval
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceEvenly, // Jarak antar item rata
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items.forEach { screen ->
-                    val isSelected = currentDestination?.route == screen.route
-
-                    // Animasi Naik Turun Ikon
-                    val offsetY by animateDpAsState(
-                        targetValue = if (isSelected) (-8).dp else 0.dp, // Kalau aktif, naik 8dp
-                        animationSpec = tween(durationMillis = 300),
-                        label = "offsetAnimation"
-                    )
-
-                    // Warna Ikon & Teks
-                    val activeColor = MaterialTheme.colorScheme.primary
-                    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .offset(y = offsetY) // Terapkan animasi naik
-                            .clip(CircleShape) // Efek ripple bulat
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null // Hilangkan ripple abu-abu standar agar bersih
-                            ) {
-                                if (currentDestination?.route != screen.route) {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            }
-                            .padding(8.dp) // Area sentuh
-                    ) {
-                        // IKON
-                        Icon(
-                            imageVector = when (screen) {
-                                HomeNavDestinations.Dashboard -> Icons.Filled.Home
-                                HomeNavDestinations.Kelas -> Icons.Filled.Schedule
-                                HomeNavDestinations.Latihan -> Icons.Filled.FitnessCenter
-                                HomeNavDestinations.Profil -> Icons.Filled.Person
-                                // Gunakan else jika perlu untuk memuaskan compiler
-                                else -> Icons.Filled.Home
-                            },
-                            contentDescription = screen.title,
-                            tint = if (isSelected) activeColor else inactiveColor,
-                            modifier = Modifier.size(26.dp)
-                        )
-
-                        // TEKS (Hanya muncul jika aktif)
-                        AnimatedVisibility(visible = isSelected) {
-                            Text(
-                                text = screen.title ?: "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = activeColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-
-                        // Opsional: Titik kecil di bawah teks untuk penanda lebih jelas
-                        if (isSelected) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 2.dp)
-                                    .size(4.dp)
-                                    .clip(CircleShape)
-                                    .background(activeColor)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeNavHost(
-    navController: NavHostController,
-    modifier: Modifier = Modifier,
-    factory: HomeViewModelFactory,
-    themeViewModel: ThemeViewModel,
-    userRole: String,
-    onLogout: () -> Unit,
-    onNavigateToWorkoutLog: () -> Unit,
-    onNavigateToClassForm: (String?) -> Unit,
-    onNavigateToSelection: (String) -> Unit,
-    onNavigateToActiveWorkout: () -> Unit,
-    onNavigateToMembership: () -> Unit,
-    onNavigateToAdminReports: () -> Unit
-) {
-    NavHost(
-        navController = navController,
-        startDestination = HomeNavDestinations.Dashboard.route,
-        modifier = modifier
-    ) {
-        // --- 1. DASHBOARD ---
-        composable(HomeNavDestinations.Dashboard.route) {
-            val dashboardVM: DashboardViewModel = viewModel(factory = factory)
-            val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            when (userRole) {
-                "Admin" -> {
-                    AdminDashboardScreen(
-                        viewModel = adminViewModel,
-                        themeViewModel = themeViewModel, // <--- TAMBAHAN: Pass themeViewModel
-                        onNavigateToReports = { navController.navigate("admin_reports") },
-                        onNavigateToTrainers = { navController.navigate("trainer_list") },
-                        onNavigateToChat = { navController.navigate("member_chat_list") },
-                        onNavigateToClasses = { navController.navigate("admin_class_list") }
-                    )
-                }
-                "Trainer" -> {
-                    TrainerDashboardScreen(
-                        factory = factory,
-                        themeViewModel = themeViewModel, // <--- TAMBAHAN: Pass themeViewModel
-                        onNavigateToClassForm = onNavigateToClassForm,
-                        onNavigateToSchedule = {
-                            navController.navigate(HomeNavDestinations.Kelas.route) { launchSingleTop = true }
-                        },
-                        onNavigateToMembers = {
-                            navController.navigate(TRAINER_MEMBERS_ROUTE) { launchSingleTop = true }
-                        }
-                    )
-                }
-                "Member" -> {
-                    val classBookingViewModel: ClassBookingViewModel = viewModel(factory = factory)
-                    MemberDashboardScreen(
-                        dashboardViewModel = dashboardVM,
-                        classViewModel = classBookingViewModel,
-                        themeViewModel = themeViewModel,
-                        onNavigateToBooking = { navController.navigate(HomeNavDestinations.Kelas.route) },
-                        onNavigateToWorkoutLog = { navController.navigate(HomeNavDestinations.Latihan.route) },
-                        onNavigateToMembership = { navController.navigate(HomeNavDestinations.Membership.route) },
-                        onNavigateToProfileTab = { navController.navigate(HomeNavDestinations.Profil.route) },
-                        onNavigateToSelection = onNavigateToSelection,
-                        onNavigateToActiveWorkout = onNavigateToActiveWorkout,
-                        onNavigateToNotifications = { navController.navigate("notifications") },
-                        onNavigateToChatList = { navController.navigate("chat_list") }
-                    )
-                }
-                else -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = GymPurple)
-                    }
-                }
-            }
-        }
-
-        // --- Rute Lain (SAMA DENGAN SEBELUMNYA) ---
-        composable(HomeNavDestinations.Kelas.route) {
-            val dashboardVM: DashboardViewModel = viewModel(factory = factory)
-            val dashState by dashboardVM.dashboardState.collectAsState()
-            val currentRole = if (dashState.userRole.isNotBlank()) dashState.userRole else userRole
-            if (currentRole == "Trainer") {
-                TrainerScheduleScreen(factory = factory, onNavigateToClassForm = onNavigateToClassForm)
-            } else {
-                val classBookingViewModel: ClassBookingViewModel = viewModel(factory = factory)
-                ClassBookingScreen(viewModel = classBookingViewModel, onNavigateBack = { navController.navigate(HomeNavDestinations.Dashboard.route) })
-            }
-        }
-
-        composable(HomeNavDestinations.Latihan.route) {
-            val workoutViewModel: WorkoutViewModel = viewModel(factory = factory)
-            WorkoutTrackerScreen(viewModel = workoutViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateToSelection = onNavigateToSelection, onNavigateToActiveWorkout = onNavigateToActiveWorkout)
-        }
-
-        composable(HomeNavDestinations.Profil.route) {
-            ProfileScreen(viewModel = viewModel(factory = factory), onLogout = onLogout, onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable(TRAINER_MEMBERS_ROUTE) {
-            TrainerMembersScreen(factory = factory, onNavigateUp = { navController.popBackStack() }, onNavigateToDetail = { memberId -> if (memberId.isNotBlank()) navController.navigate("member_detail/$memberId") })
-        }
-
-        composable(MEMBER_DETAIL_ROUTE, arguments = listOf(navArgument("memberId") { type = NavType.StringType })) { backStackEntry ->
-            val trainerViewModel: TrainerViewModel = viewModel(factory = factory)
-            val memberId = backStackEntry.arguments?.getString("memberId") ?: ""
-            MemberDetailScreen(navController = navController, viewModel = trainerViewModel, memberId = memberId)
-        }
-
-        composable("notifications") { NotificationScreen(onNavigateBack = { navController.popBackStack() }) }
-
-        // Route Chat List
-        composable("chat_list") {
-            val trainerListViewModel: TrainerListViewModel = viewModel(factory = factory)
-            TrainerListScreen(
-                viewModel = trainerListViewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToChat = { trainerId -> navController.navigate("chat_screen/$trainerId") }
-            )
-        }
-
-        composable("chat_screen/{otherUserId}", arguments = listOf(navArgument("otherUserId") { type = NavType.StringType })) { backStackEntry ->
-            val chatViewModel: ChatViewModel = viewModel(factory = factory)
-            val otherUserId = backStackEntry.arguments?.getString("otherUserId") ?: ""
-            ChatScreen(viewModel = chatViewModel, otherUserId = otherUserId, onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable(HomeNavDestinations.Membership.route) {
-            val membershipViewModel: MembershipViewModel = viewModel(factory = factory)
-            MembershipScreen(viewModel = membershipViewModel, onNavigateBack = { navController.popBackStack() })
-        }
-
-        // 1. MEMBER LIST (ADMIN)
-        composable("member_chat_list") {
-            val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            AdminMemberListScreen(
-                viewModel = adminViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // 2. TRAINER LIST (ADMIN)
-        composable("trainer_list") {
-            val adminViewModel: AdminViewModel = viewModel(factory = factory)
-
-            // [FIX] Gunakan AdminTrainerListScreen, JANGAN TrainerListScreen
-            AdminTrainerListScreen(
-                viewModel = adminViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // 3. ADMIN REPORTS
-        composable("admin_reports") {
-            val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            AdminReportsScreen(
-                viewModel = adminViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // 4. CLASS LIST
-        composable("admin_class_list") {
-            val adminViewModel: AdminViewModel = viewModel(factory = factory)
-            AdminClassListScreen(
-                viewModel = adminViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-    }
 }

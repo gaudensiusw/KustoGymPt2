@@ -9,8 +9,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,133 +22,195 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.projekuas.data.Booking
 import com.example.projekuas.viewmodel.HomeViewModelFactory
 import com.example.projekuas.viewmodel.TrainerViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Model data sementara untuk UI (seharusnya dari Booking/Review data)
-data class ReviewItem(
-    val memberName: String,
-    val rating: Int,
-    val comment: String,
-    val date: Long
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainerReviewsScreen(
-    factory: HomeViewModelFactory, // Gunakan factory yang ada
+    factory: HomeViewModelFactory,
     onNavigateBack: () -> Unit
 ) {
-    // Kita bisa reuse TrainerViewModel atau buat baru.
-    // Untuk efisiensi, asumsikan TrainerViewModel punya fungsi getReviews()
     val viewModel: TrainerViewModel = viewModel(factory = factory)
+    // Gunakan state flow
     val state by viewModel.uiState.collectAsState()
 
-    // TODO: Anda perlu menambahkan 'reviews' ke dalam TrainerUiState
-    // val reviews = state.reviews
-
-    // DUMMY DATA (Sampai Anda update ViewModel & Repo untuk fetch 'bookings' where trainerId == me & rating > 0)
-    val dummyReviews = listOf(
-        ReviewItem("Eric Kustanto", 5, "Kelasnya seru banget! Penjelasannya jelas.", System.currentTimeMillis()),
-        ReviewItem("Budi Santoso", 4, "Lumayan capek, tapi worth it.", System.currentTimeMillis() - 86400000)
-    )
-
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.White, // Cleaner look
         topBar = {
             TopAppBar(
-                title = { Text("Student Reviews", fontWeight = FontWeight.Bold) },
+                title = { Text("My Reviews", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp)
         ) {
-            // Header Summary Rating
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            // Header Stats
+            ReviewSummaryCard(
+                rating = state.rating,
+                count = state.ratingCount,
+                modifier = Modifier.padding(bottom = 24.dp, top = 8.dp)
+            )
+
+            Text(
+                "Recent Feedback",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            if (state.reviews.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(20.dp).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Average Rating", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text(
-                                "4.8", // Ambil dari state.performanceRate atau field baru
-                                fontSize = 36.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("No reviews yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (state.isLoading) {
+                            Spacer(Modifier.height(8.dp))
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
                         }
-                        Icon(
-                            Icons.Default.Star,
-                            null,
-                            tint = Color(0xFFFFC107), // Emas
-                            modifier = Modifier.size(48.dp)
-                        )
                     }
                 }
-            }
-
-            item {
-                Text("Recent Feedback", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
-            }
-
-            items(dummyReviews) { review ->
-                ReviewCard(review)
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp)
+                ) {
+                    items(state.reviews) { review ->
+                        ReviewItemCard(review)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun ReviewCard(review: ReviewItem) {
-    val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-
+fun ReviewSummaryCard(rating: Double, count: Int, modifier: Modifier = Modifier) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar Inisial
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(review.memberName.take(1), color = Color.White, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("Overall Rating", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        String.format(Locale.getDefault(), "%.1f", rating),
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.Bold, // Extra Bold
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("/ 5.0", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f), modifier = Modifier.padding(bottom = 8.dp))
                 }
+                StarRatingBar(rating = rating.toInt(), starSize = 20.dp, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            
+            Column(horizontalAlignment = Alignment.End) {
+                 Text(
+                    "$count",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text("Total Reviews", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
+            }
+        }
+    }
+}
+
+@Composable
+fun ReviewItemCard(review: Booking) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+        elevation = CardDefaults.cardElevation(0.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Initial Avatar
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            review.userName.take(1).uppercase().ifBlank { "M" },
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                
                 Spacer(Modifier.width(12.dp))
+                
                 Column {
-                    Text(review.memberName, fontWeight = FontWeight.Bold)
-                    Text(dateFormat.format(Date(review.date)), fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        review.userName.ifBlank { "Gym Member" },
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(review.bookingTimeMillis)),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Spacer(Modifier.weight(1f))
-                // Bintang Kecil
-                Row {
-                    Text(review.rating.toString(), fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(16.dp))
-                }
+                StarRatingBar(rating = review.rating, starSize = 14.dp, tint = Color(0xFFFFC107))
             }
-            Spacer(Modifier.height(8.dp))
-            Text(review.comment, style = MaterialTheme.typography.bodyMedium)
+            
+            if (review.review.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    review.review,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StarRatingBar(rating: Int, starSize: androidx.compose.ui.unit.Dp, tint: Color) {
+    Row {
+        for (i in 1..5) {
+            Icon(
+                imageVector = if (i <= rating) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = null,
+                tint = if (i <= rating) tint else Color.Gray.copy(alpha = 0.3f),
+                modifier = Modifier.size(starSize)
+            )
         }
     }
 }

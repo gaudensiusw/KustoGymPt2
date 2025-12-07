@@ -16,11 +16,13 @@ import com.example.projekuas.ui.theme.GymOrange
 @Composable
 fun RatingDialog(
     trainerName: String,
+    initialRating: Int = 0,
+    initialReview: String = "",
     onDismiss: () -> Unit,
     onSubmit: (Int, String) -> Unit
 ) {
-    var rating by remember { mutableIntStateOf(0) }
-    var review by remember { mutableStateOf("") }
+    var rating by remember { mutableIntStateOf(initialRating) }
+    var review by remember { mutableStateOf(initialReview) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

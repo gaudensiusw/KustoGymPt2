@@ -61,7 +61,8 @@ fun TrainerScheduleScreen(
             FloatingActionButton(
                 onClick = { onNavigateToClassForm(null) },
                 containerColor = TrainerBluePrimary,
-                contentColor = Color.White
+                contentColor = Color.White,
+                modifier = Modifier.padding(bottom = 80.dp) // Lift FAB above Bottom Nav
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Class")
             }
@@ -333,13 +334,19 @@ fun ClassSessionCard(gymClass: GymClass, onClick: () -> Unit) {
                     }
 
                     // Status Badge
+                    val (containerColor, contentColor) = when (gymClass.status) {
+                        "Ongoing" -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+                        "Finished" -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                    }
+
                     Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = containerColor,
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            "Upcoming",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            gymClass.status,
+                            color = contentColor,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)

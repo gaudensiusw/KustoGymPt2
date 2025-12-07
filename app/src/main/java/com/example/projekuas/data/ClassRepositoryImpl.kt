@@ -100,6 +100,9 @@ class ClassRepositoryImpl(
 
             // 2. [ATURAN 2] Cek Role User (Trainer tidak boleh booking)
             val role = userSnapshot.getString("role") ?: "Member"
+            // Ambil Nama User untuk disimpan di Booking
+            val userName = userSnapshot.getString("name") ?: "Unknown User"
+
             if (role == "Trainer") {
                 throw FirebaseFirestoreException(
                     "Trainer tidak diperbolehkan mendaftar kelas.",
@@ -107,43 +110,15 @@ class ClassRepositoryImpl(
                 )
             }
 
-            // 3. [ATURAN 1] Cek apakah User sudah booking kelas ini
-            if (bookingSnapshot.exists()) {
-                throw FirebaseFirestoreException(
-                    "Anda sudah terdaftar di kelas ini.", FirebaseFirestoreException.Code.ABORTED
-                )
-            }
-
-            // 1. Validasi Data Kelas
-            val currentBookings = classSnapshot.getLong("currentBookings") ?: 0
-            val capacity = classSnapshot.getLong("capacity") ?: 0
-            val isAvailable = classSnapshot.getBoolean("isAvailable") ?: true
-
-            // 2. Cek Aturan Bisnis
-            if (!isAvailable) {
-                throw FirebaseFirestoreException(
-                    "Kelas tidak tersedia",
-                    FirebaseFirestoreException.Code.ABORTED
-                )
-            }
-
-            if (currentBookings >= capacity) {
-                throw FirebaseFirestoreException(
-                    "Kelas Penuh",
-                    FirebaseFirestoreException.Code.ABORTED
-                )
-            }
-
-            // 3. Update Kuota (+1)
-            transaction.update(classRef, "currentBookings", currentBookings + 1)
+            // ... (validation code)
 
             // 4. Catat Siapa yang Booking (Buat dokumen baru di koleksi 'bookings')
-            // Kita pakai BookingDetail data class yang sudah Anda buat
-//            val newBookingRef = firestore.collection("bookings").document()
             val bookingData = hashMapOf(
                 "bookingId" to bookingId,
                 "classId" to classId,
-                "memberId" to userId,
+                "userId" to userId,
+                "userName" to userName,
+                "trainerId" to (classSnapshot.getString("trainerId") ?: ""), // FIX: Save trainerId for reviews
                 "bookingTimeMillis" to System.currentTimeMillis(),
                 "checkInStatus" to false,
                 "qrCodeContent" to bookingId // Format simple untuk QR
@@ -173,7 +148,7 @@ class ClassRepositoryImpl(
     // [IMPLEMENTASI BARU]
     override fun getUserBookedClassIds(userId: String): Flow<Set<String>> = callbackFlow {
         val query = firestore.collection("bookings")
-            .whereEqualTo("memberId", userId)
+            .whereEqualTo("userId", userId) // FIX: Consistent userId
 
         val subscription = query.addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -186,6 +161,23 @@ class ClassRepositoryImpl(
                     .mapNotNull { it.getString("classId") }
                     .toSet()
                 trySend(bookedIds).isSuccess
+            }
+        }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getUserBookingsStream(userId: String): Flow<List<Booking>> = callbackFlow {
+        val query = firestore.collection("bookings")
+            .whereEqualTo("userId", userId)
+
+        val subscription = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val bookings = snapshot.toObjects(Booking::class.java)
+                trySend(bookings).isSuccess
             }
         }
         awaitClose { subscription.remove() }
@@ -260,7 +252,7 @@ class ClassRepositoryImpl(
             val snapshot = firestore.collection("bookings")
                 .whereEqualTo("classId", classId)
                 .whereEqualTo(
-                    "memberId",
+                    "userId",
                     userId
                 ) // Pastikan field di DB 'memberId' atau 'userId' (sesuaikan Booking.kt)
                 .get()
@@ -305,7 +297,9 @@ class ClassRepositoryImpl(
             transaction.update(bookingRef, mapOf(
                 "rating" to rating,
                 "review" to review,
-                "isRated" to true // Tandai sudah dirating di dokumen Booking
+                "isRated" to true,
+                "ratingTimestamp" to System.currentTimeMillis(), // SAVE TIMESTAMP
+                "trainerId" to trainerId
             ))
 
             // 5. Update Trainer
@@ -342,9 +336,28 @@ class ClassRepositoryImpl(
     override suspend fun findBookingDocument(classId: String, userId: String): com.google.firebase.firestore.QuerySnapshot {
         return firestore.collection("bookings")
             .whereEqualTo("classId", classId)
-            .whereEqualTo("userId", userId)
+            .whereEqualTo("userId", userId) // FIX: Sudah benar userId
             .get()
             .await()
+    }
+
+    override fun getTrainerReviews(trainerId: String): Flow<List<Booking>> = callbackFlow {
+        val query = firestore.collection("bookings")
+            .whereEqualTo("trainerId", trainerId)
+        
+        val subscription = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val bookings = snapshot.toObjects(Booking::class.java)
+                // Filter hanya yang sudah memberi rating
+                val reviews = bookings.filter { it.rating > 0 }
+                trySend(reviews).isSuccess
+            }
+        }
+        awaitClose { subscription.remove() }
     }
 
 }

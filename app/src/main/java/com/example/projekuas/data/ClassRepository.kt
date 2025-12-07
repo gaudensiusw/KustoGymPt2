@@ -19,6 +19,8 @@ interface ClassRepository {
     suspend fun getBookingId(classId: String, userId: String): String?
     suspend fun findBookingDocument(classId: String, userId: String): com.google.firebase.firestore.QuerySnapshot
     suspend fun submitRating(bookingId: String, trainerId: String, rating: Int, review: String)
+    fun getTrainerReviews(trainerId: String): Flow<List<Booking>>
+    fun getUserBookingsStream(userId: String): Flow<List<Booking>> // FIX: Fetch full booking objects
 }
 
 // File: com/example.projekuas.data.ClassRepositoryImpl.kt (Implementasi)

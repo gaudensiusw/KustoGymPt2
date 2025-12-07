@@ -61,6 +61,21 @@ class AdminRepositoryImpl(
         awaitClose { subscription.remove() }
     }
 
+    override fun getTransactionsStream(): Flow<List<Transaction>> = callbackFlow {
+        val collectionRef = firestore.collection("transactions")
+        val subscription = collectionRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val transactions = snapshot.toObjects(Transaction::class.java)
+                trySend(transactions).isSuccess
+            }
+        }
+        awaitClose { subscription.remove() }
+    }
+
     // 2. Mengubah peran pengguna (Mengubah field 'role')
     override suspend fun updateUserRole(userId: String, newRole: String) {
         val userDocRef = firestore.collection("users").document(userId)
