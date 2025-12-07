@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.projekuas.data.AuthRepository
 import com.example.projekuas.data.ProfileRepository
 import com.example.projekuas.data.UserProfile
+import com.example.projekuas.data.Achievement
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +21,9 @@ data class ProfileUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    val achievementList: List<Achievement> = emptyList(),
+    val unlockedIds: Set<String> = emptySet() // Assuming IDs are Strings
 )
 
 class ProfileViewModel(
@@ -42,6 +45,7 @@ class ProfileViewModel(
             it.copy(userProfile = UserProfile(userId = currentUserId, email = currentUserEmail))
         }
         loadUserProfile()
+        loadAchievements()
     }
 
     private fun loadUserProfile() {
@@ -173,6 +177,24 @@ class ProfileViewModel(
     fun logout() {
         viewModelScope.launch {
             try { authRepository.signOut() } catch (e: Exception) {}
+        }
+    }
+    private fun loadAchievements() {
+        viewModelScope.launch {
+            // 1. Ambil Master Data
+            val allAchievements = profileRepository.getAllAchievements()
+
+            // 2. Ambil Data User (jika login)
+            if (currentUserId.isNotBlank()) {
+                val myUnlockedIds = profileRepository.getUserUnlockedAchievements(currentUserId)
+
+                _uiState.update {
+                    it.copy(
+                        achievementList = allAchievements,
+                        unlockedIds = myUnlockedIds.toSet()
+                    )
+                }
+            }
         }
     }
 }

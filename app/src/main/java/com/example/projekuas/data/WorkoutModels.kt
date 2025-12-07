@@ -39,3 +39,10 @@ data class ExerciseMaster(
     val name: String = "",
     val targetMuscle: String = ""
 )
+
+// 5. Model untuk Grafik Volume (Query Result)
+// Digunakan oleh WorkoutLogDao untuk menampung hasil query total volume per tanggal
+data class VolumeData(
+    val date: String,      // Tanggal (misal: "2023-10-27")
+    val totalVolume: Float // Total beban (kg * reps)
+)

@@ -60,7 +60,8 @@ class HomeViewModelFactory(
         if (modelClass.isAssignableFrom(WorkoutViewModel::class.java)) {
             return WorkoutViewModel(
                 workoutRepository = workoutDataRepository,
-                authRepository = authRepository
+                authRepository = authRepository,
+                profileRepository = profileRepository // <--- TAMBAHKAN BARIS INI
             ) as T
         }
 

@@ -31,4 +31,8 @@ interface ProfileRepository {
     // Simpan profil baru (saat register)
     suspend fun saveUserProfile(profile: UserProfile)
 
+    suspend fun getAllAchievements(): List<Achievement>
+    suspend fun getUserUnlockedAchievements(userId: String): List<String>
+    suspend fun unlockAchievement(userId: String, achievement: Achievement)
+
 }

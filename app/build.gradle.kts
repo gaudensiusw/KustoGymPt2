@@ -42,6 +42,13 @@ android {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Vico Charts
+    implementation("com.patrykandpatrick.vico:compose-m3:1.12.0")
+    implementation("com.patrykandpatrick.vico:core:1.12.0")
+
+    implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.compose.ui:ui-graphics")
 
     implementation("com.google.zxing:core:3.5.1")
@@ -58,6 +65,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.androidx.webkit)
+    implementation(libs.play.services.games)
 
 
     // implementation(libs.firebase.database) // Duplikat dengan deklarasi di bawah, bisa dihapus jika libs.versions.toml sudah benar

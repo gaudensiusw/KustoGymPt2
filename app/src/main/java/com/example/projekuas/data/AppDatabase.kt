@@ -5,15 +5,18 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+
+
 // PENTING:
 // 1. Entities: Gabungkan entity lama (WorkoutLogEntity) dan baru (WorkoutSessionEntity)
 // 2. Version: Dinaikkan jadi 2 karena ada perubahan struktur
 @Database(
     entities = [
         WorkoutLogEntity::class,     // Entity lama (untuk log set/reps)
-        WorkoutSessionEntity::class  // Entity baru (untuk tracker durasi/kalori)
+        WorkoutSessionEntity::class,  // Entity baru (untuk tracker durasi/kalori)
+        UserAchievementEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

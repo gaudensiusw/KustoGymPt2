@@ -6,6 +6,7 @@ import com.example.projekuas.data.AuthRepository
 import com.example.projekuas.data.ExerciseLog
 import com.example.projekuas.data.ExerciseMaster
 import com.example.projekuas.data.HistorySelectionState
+import com.example.projekuas.data.ProfileRepository
 import com.example.projekuas.data.SetLog
 import com.example.projekuas.data.WorkoutDataRepository
 import com.example.projekuas.data.WorkoutSession
@@ -38,7 +39,8 @@ data class SelectionState(
 
 class WorkoutViewModel(
     private val workoutRepository: WorkoutDataRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository // <--- TAMBAHAN 1: Inject Repository ini
 ) : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -245,24 +247,57 @@ class WorkoutViewModel(
         )
 
         viewModelScope.launch {
+            // 1. Simpan Workout ke Database
             workoutRepository.saveWorkoutSession(session)
-            loadHistoryData() // Refresh history
-        }
 
-        // LANGSUNG PINDAH HALAMAN (UX lancar)
-        // Reset state UI
-        _uiState.update { WorkoutUiState() }
-        _selectionState.update { SelectionState() }
-        onSuccess()
+            // 2. Refresh History Lokal
+            loadHistoryData()
+
+            // 3. CEK ACHIEVEMENT (Logic Baru)
+            checkAndUnlockAchievements(userId)
+
+            // 4. Reset State UI
+            _uiState.update { WorkoutUiState() }
+            _selectionState.update { SelectionState() }
+
+            // 5. Pindah Halaman
+            onSuccess()
+        }
     }
 
+    // --- LOGIC BARU: CHECK ACHIEVEMENTS ---
+    private suspend fun checkAndUnlockAchievements(userId: String) {
+        try {
+            // A. Ambil Data Statistik Terbaru
+            val totalSessions = _totalCount.value + 1 // +1 karena baru saja save
+            // Jika ada achievement lain (e.g. total berat), ambil datanya di sini
 
-    // Fallback untuk finish tanpa save jika perlu (tombol back)
-    fun finishWorkout(onFinish: () -> Unit) {
-        // Biasanya kita ingin save, tapi jika tombolnya "Finish Workout" yang memicu dialog,
-        // logika ini ada di UI. Fungsi ini mungkin sisa dari kode lama,
-        // tapi kita bisa arahkan ke saveWorkout default atau biarkan untuk logika cancel.
-        // Untuk saat ini, UI memanggil saveWorkout melalui Dialog, jadi ini aman.
+            // B. Ambil Master List Achievement dari Firebase
+            val allAchievements = profileRepository.getAllAchievements()
+
+            // C. Cek satu per satu
+            allAchievements.forEach { achievement ->
+                var isEligible = false
+
+                // Cek Tipe Achievement
+                if (achievement.type == "COUNT" && totalSessions >= achievement.threshold) {
+                    isEligible = true
+                }
+                // Tambahkan logika lain: else if (achievement.type == "STREAK" ...)
+
+                // D. Jika Eligible, Cek apakah user SUDAH punya?
+                if (isEligible) {
+                    val alreadyUnlocked = profileRepository.getUserUnlockedAchievements(userId)
+                    if (!alreadyUnlocked.contains(achievement.id)) {
+                        // E. UNLOCK! Simpan ke Firebase user
+                        profileRepository.unlockAchievement(userId, achievement)
+                        // Opsional: Trigger notifikasi UI di sini (misal lewat Snackbar channel)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace() // Jangan sampai error achievement bikin crash app
+        }
     }
 
     private val _historySelection = MutableStateFlow(HistorySelectionState())

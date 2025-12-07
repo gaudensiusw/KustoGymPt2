@@ -11,6 +11,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,6 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -42,6 +46,8 @@ import coil3.request.crossfade
 import com.example.projekuas.R
 import com.example.projekuas.viewmodel.ProfileViewModel
 import com.example.projekuas.ui.theme.* // Import semua warna dari Color.kt
+import com.example.projekuas.data.Achievement
+import com.example.projekuas.data.UserAchievement
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -52,19 +58,29 @@ val fitnessLevels = listOf("Beginner", "Intermediate", "Pro")
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel,
-    // [HAPUS] userRole dihapus dari sini karena kita ambil langsung dari ViewModel
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.userProfile
 
+    // --- 1. DEFINE MOCK DATA FOR VISUAL TESTING ---
+    // In ProfileScreen, replace mockAchievements with this:
+    val mockAchievements = listOf(
+        // ID "1" is Unlocked -> Will show Purple
+        Achievement("1", "First Step", Icons.Default.DirectionsWalk, isUnlocked = true),
+        // ID "2" is Locked -> Will show Gray
+        Achievement("2", "Heavy Lifter", Icons.Default.FitnessCenter, isUnlocked = false),
+        // ID "3" is Locked -> Will show Gray
+        Achievement("3", "Hydrated", Icons.Default.WaterDrop, isUnlocked = false),
+        // ID "4" is Locked-> Will show Gray
+        Achievement("4", "Champion", Icons.Default.EmojiEvents, isUnlocked = false)
+    )
+
     // [BARU] Ambil Role langsung dari data profil yang sedang login
-    // Jika data belum masuk (loading), default ke "Member"
     val userRole = if (profile.role.isNotBlank()) profile.role else "Member"
 
     // --- LOGIKA WARNA DINAMIS ---
-    // Sekarang warnanya akan bereaksi terhadap perubahan data 'profile.role'
     val (primaryColor, darkPrimaryColor) = when (userRole.lowercase()) {
         "admin" -> GymGreen to GymGreenDark
         "trainer" -> GymBlue to GymBlueDark
@@ -72,9 +88,8 @@ fun ProfileScreen(
     }
 
     // --- PERBAIKAN DATA UNTUK TAMPILAN ---
-
     val dobString = remember(profile.dateOfBirthMillis) {
-        if (profile.dateOfBirthMillis > 0L) { // Pakai 0L untuk Long
+        if (profile.dateOfBirthMillis > 0L) {
             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(profile.dateOfBirthMillis))
         } else {
             ""
@@ -82,7 +97,6 @@ fun ProfileScreen(
     }
 
     val phoneString = profile.phoneNumber ?: ""
-
     val heightVal = profile.heightCm
     val weightVal = profile.weightKg
     val heightM = if (heightVal > 0) heightVal / 100.0 else 1.0
@@ -210,7 +224,6 @@ fun ProfileScreen(
 
                             Spacer(Modifier.height(8.dp))
 
-                            // LABEL ROLE PENGGUNA (Menggunakan userRole yang didapat dari DB)
                             Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
                                 Text(
                                     text = userRole.uppercase(),
@@ -286,6 +299,29 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            // --- 2. ACHIEVEMENTS SECTION (USING MOCK DATA FOR NOW) ---
+            item {
+                Text(
+                    text = "Achievements",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // FIX: Using mockAchievements to ensure visuals appear
+                    items(mockAchievements) { achievement ->
+                        AchievementBadge(achievement = achievement)
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             // SETTINGS
             item {
                 Card(
@@ -320,7 +356,7 @@ fun ProfileScreen(
         )
     }
 
-    // EDIT SHEET (Bagian ini tidak berubah, hanya formatting kecil)
+    // EDIT SHEET (Corrected and Duplicates Removed)
     if (showEditSheet) {
         ModalBottomSheet(
             onDismissRequest = { showEditSheet = false },
@@ -374,81 +410,6 @@ fun ProfileScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     EditTextField(label = "Height (cm)", value = if (profile.heightCm > 0) profile.heightCm.toString() else "", onValueChange = viewModel::onHeightChange, activeColor = primaryColor, keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
                     EditTextField(label = "Weight (kg)", value = if (profile.weightKg > 0) profile.weightKg.toString() else "", onValueChange = viewModel::onWeightChange, activeColor = primaryColor, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(12.dp))
-
-                LevelFitnessDropdown(profile.fitnessLevel, primaryColor, viewModel::onFitnessLevelSelected)
-                Spacer(Modifier.height(24.dp))
-
-                Button(
-                    onClick = { viewModel.saveProfile() },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = !uiState.isSaving,
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-                ) {
-                    if (uiState.isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp)) else Text("Simpan Perubahan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-                Text("Cooldown 1 jam setiap kali menyimpan profil.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            }
-        }
-    }
-
-
-    // EDIT SHEET
-    if (showEditSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showEditSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 50.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text("Edit Profil", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 20.dp))
-
-                EditTextField(label = "Full Name", value = profile.name, onValueChange = viewModel::onNameChange, primaryColor)
-                Spacer(Modifier.height(12.dp))
-
-                EditTextField(label = "Phone Number", value = phoneString, onValueChange = viewModel::onPhoneChange, primaryColor, KeyboardType.Phone)
-                Spacer(Modifier.height(12.dp))
-
-                EditTextField(label = "Address", value = profile.address, onValueChange = viewModel::onAddressChange, primaryColor)
-                Spacer(Modifier.height(12.dp))
-
-                EditTextField(
-                    label = "Date of Birth (YYYY-MM-DD)",
-                    value = dobInput,
-                    onValueChange = {
-                        dobInput = it
-                        viewModel.onDobChange(it)
-                    },
-                    primaryColor,
-                    KeyboardType.Number
-                )
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = profile.gender.ifBlank { "Not Set" },
-                    onValueChange = {},
-                    label = { Text("Gender (Locked)") },
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    enabled = false
-                )
-                Spacer(Modifier.height(12.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    EditTextField(label = "Height (cm)", value = if (profile.heightCm > 0) profile.heightCm.toString() else "", onValueChange = viewModel::onHeightChange, primaryColor, KeyboardType.Number, modifier = Modifier.weight(1f))
-                    EditTextField(label = "Weight (kg)", value = if (profile.weightKg > 0) profile.weightKg.toString() else "", onValueChange = viewModel::onWeightChange, primaryColor, KeyboardType.Decimal, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(12.dp))
 
@@ -550,4 +511,89 @@ fun base64ToBitmap(base64String: String): android.graphics.Bitmap? {
         val decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT)
         BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
     } catch (e: Exception) { e.printStackTrace(); null }
+}
+
+// Add this Composable to your ProfileScreen
+@Composable
+fun AchievementBadge(achievement: Achievement) {
+    // Logic: If unlocked -> Primary Color. If locked -> Gray.
+    val backgroundColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.primaryContainer else Color.Gray.copy(alpha = 0.2f)
+    val iconColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.primary else Color.Gray
+    val textColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.onSurface else Color.Gray
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(80.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(CircleShape)
+                .background(backgroundColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = achievement.icon,
+                contentDescription = achievement.title,
+                tint = iconColor,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = achievement.title,
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center,
+            color = textColor,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+@Composable
+fun AchievementsSection(achievements: List<Achievement>) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    ) {
+        items(achievements) { item ->
+            AchievementItem(achievement = item)
+        }
+    }
+}
+
+@Composable
+fun AchievementItem(achievement: Achievement) {
+    val backgroundColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.primaryContainer else Color.LightGray.copy(alpha = 0.3f)
+    val iconColor = if (achievement.isUnlocked) MaterialTheme.colorScheme.primary else Color.Gray
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(70.dp) // Fixed width keeps them uniform
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(60.dp)
+                .background(color = backgroundColor, shape = CircleShape)
+        ) {
+            Icon(
+                imageVector = achievement.icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = achievement.title,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (achievement.isUnlocked) Color.Black else Color.Gray,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }

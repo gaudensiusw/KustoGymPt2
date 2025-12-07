@@ -5,11 +5,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Repeat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
-// import com.google.firebase.storage.FirebaseStorage // DIHAPUS karena tidak dipakai
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -18,30 +23,30 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
+// Ensure we are using YOUR Achievement class
+import com.example.projekuas.data.Achievement
+
 class ProfileRepositoryImpl(
     private val context: Context,
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     storage: FirebaseStorage
-    // Parameter 'storage: FirebaseStorage' dihapus karena tidak digunakan untuk Base64
 ) : ProfileRepository {
-    // --- FUNGSI HELPER: Kompres & Convert ke Base64 (TIDAK BERUBAH) ---
+
+    // --- EXISTING HELPER FUNCTIONS ---
     private suspend fun compressAndConvertToBase64(uri: Uri): String? {
         return withContext(Dispatchers.IO) {
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
-                val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return@withContext null
+                val originalBitmap =
+                    BitmapFactory.decodeStream(inputStream) ?: return@withContext null
                 inputStream?.close()
-
                 val scaledBitmap = getResizedBitmap(originalBitmap, 500)
-
                 val outputStream = ByteArrayOutputStream()
                 scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
                 val byteArrays = outputStream.toByteArray()
-
                 val base64String = Base64.encodeToString(byteArrays, Base64.DEFAULT)
                 "data:image/jpeg;base64,$base64String"
-
             } catch (e: Exception) {
                 e.printStackTrace()
                 null
@@ -52,7 +57,6 @@ class ProfileRepositoryImpl(
     private fun getResizedBitmap(image: Bitmap, maxSize: Int): Bitmap {
         var width = image.width
         var height = image.height
-
         val bitmapRatio = width.toFloat() / height.toFloat()
         if (bitmapRatio > 1) {
             width = maxSize
@@ -63,19 +67,14 @@ class ProfileRepositoryImpl(
         }
         return Bitmap.createScaledBitmap(image, width, height, true)
     }
-    // ----------------------------------------------------
 
-    // 4. Upload Foto Profil (Simpan Base64 ke Firestore)
     override suspend fun uploadProfileImage(uri: Uri): String? {
         val userId = auth.currentUser?.uid ?: return null
-
         val base64Image = compressAndConvertToBase64(uri) ?: return null
-
         return try {
             firestore.collection("users").document(userId)
                 .update("profilePictureUrl", base64Image)
                 .await()
-
             base64Image
         } catch (e: Exception) {
             e.printStackTrace()
@@ -83,7 +82,6 @@ class ProfileRepositoryImpl(
         }
     }
 
-    // --- MODIFIKASI: Tambah fungsi getLoggedInUserProfile (Flow) untuk ViewModel ---
     override fun getLoggedInUserProfile(): Flow<UserProfile> = callbackFlow {
         val userId = auth.currentUser?.uid
         if (userId == null) {
@@ -93,20 +91,18 @@ class ProfileRepositoryImpl(
         }
         val docRef = firestore.collection("users").document(userId)
         val subscription = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) { close(error); return@addSnapshotListener }
+            if (error != null) {
+                close(error); return@addSnapshotListener
+            }
             if (snapshot != null && snapshot.exists()) {
                 val profile = snapshot.toObject(UserProfile::class.java) ?: UserProfile()
                 trySend(profile).isSuccess
             } else {
-                // Return default UserProfile jika tidak ada (meskipun seharusnya ada setelah login/signup)
                 trySend(UserProfile()).isSuccess
             }
         }
         awaitClose { subscription.remove() }
     }
-
-
-    // --- FUNGSI LAINNYA ---
 
     override fun getUserProfile(userId: String): Flow<UserProfile> = callbackFlow {
         if (userId.isBlank()) {
@@ -116,7 +112,9 @@ class ProfileRepositoryImpl(
         }
         val docRef = firestore.collection("users").document(userId)
         val subscription = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) { close(error); return@addSnapshotListener }
+            if (error != null) {
+                close(error); return@addSnapshotListener
+            }
             if (snapshot != null && snapshot.exists()) {
                 val profile = snapshot.toObject(UserProfile::class.java) ?: UserProfile()
                 trySend(profile).isSuccess
@@ -131,7 +129,9 @@ class ProfileRepositoryImpl(
 
     override fun getProfile(): Flow<UserProfile?> = callbackFlow {
         val userId = auth.currentUser?.uid
-        if (userId == null) { trySend(null).isSuccess; close(); return@callbackFlow }
+        if (userId == null) {
+            trySend(null).isSuccess; close(); return@callbackFlow
+        }
         val docRef = firestore.collection("users").document(userId)
         val subscription = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) return@addSnapshotListener
@@ -161,7 +161,6 @@ class ProfileRepositoryImpl(
     }
 
     override fun getTrainers(): Flow<List<UserProfile>> = callbackFlow {
-        // Query ke collection 'users' dimana field 'role' adalah 'Trainer'
         val listener = firestore.collection("users")
             .whereEqualTo("role", "Trainer")
             .addSnapshotListener { snapshot, error ->
@@ -175,5 +174,71 @@ class ProfileRepositoryImpl(
                 }
             }
         awaitClose { listener.remove() }
+    }
+
+    // --- NEW ACHIEVEMENT IMPLEMENTATION (Fixed Imports) ---
+
+    // 1. CHANGE THIS: Hardcode the list here because ImageVector cannot come from Firebase
+    override suspend fun getAllAchievements(): List<Achievement> {
+        return listOf(
+            Achievement(
+                id = "1",
+                title = "First Step",
+                icon = Icons.Default.DirectionsWalk,
+                type = "COUNT",
+                threshold = 1
+            ),
+            Achievement(
+                id = "2",
+                title = "Consistency",
+                icon = Icons.Default.Repeat,
+                type = "COUNT",
+                threshold = 5
+            ),
+            Achievement(
+                id = "3",
+                title = "Heavy Lifter",
+                icon = Icons.Default.FitnessCenter,
+                type = "WEIGHT",
+                threshold = 100
+            ),
+            Achievement(
+                id = "4",
+                title = "Champion",
+                icon = Icons.Default.EmojiEvents,
+                type = "COUNT",
+                threshold = 50
+            )
+        )
+    }
+
+    // 2. THIS IS FINE: Checks what the user actually owns
+    override suspend fun getUserUnlockedAchievements(userId: String): List<String> {
+        return try {
+            val snapshot = firestore.collection("users").document(userId)
+                .collection("achievements").get().await()
+            // We only need the IDs to match against our hardcoded list
+            snapshot.documents.map { it.id }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    // 3. THIS IS FINE: Saves the unlock status to Firebase
+    override suspend fun unlockAchievement(userId: String, achievement: Achievement) {
+        try {
+            // Set the current time explicitly here
+            val userAchievement = UserAchievement(
+                achievementId = achievement.id,
+                dateUnlocked = System.currentTimeMillis()
+            )
+
+            firestore.collection("users").document(userId)
+                .collection("achievements").document(achievement.id)
+                .set(userAchievement)
+                .await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

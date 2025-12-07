@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+
 @Dao
 interface WorkoutLogDao {
     @Insert
@@ -21,4 +22,15 @@ interface WorkoutLogDao {
     // Query KRUSIAL untuk sinkronisasi
     @Query("SELECT * FROM workout_log WHERE syncStatus = :pendingStatus")
     suspend fun getPendingLogs(pendingStatus: Int = SyncStatus.PENDING.code): List<WorkoutLogEntity>
+
+    @Query("""
+    SELECT 
+        strftime('%Y-%m-%d', dateMillis / 1000, 'unixepoch') as date, 
+        SUM(weight * reps) as totalVolume 
+    FROM workout_log 
+    WHERE exerciseName = :exerciseName 
+    GROUP BY date 
+    ORDER BY date ASC
+""")
+    fun getVolumeHistory(exerciseName: String): Flow<List<VolumeData>>
 }
